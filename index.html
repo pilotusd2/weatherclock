@@ -4,9 +4,7 @@
   <meta charset="UTF-8">
   <title>Väderklocka</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: Arial, sans-serif;
@@ -14,333 +12,176 @@
       flex-direction: column;
       align-items: center;
       height: 100vh;
+      /* Låt body vara neutral; vi färgsätter .left och .right */
+      background: #ffffff;
+      color: #000000;
       transition: background-color 1s ease, color 1s ease;
     }
-    #clock {
-      font-size: 25vw; text-align: center;
-      margin: 20px 0 10px 0;
-    }
-    .columns {
-      display: flex;
-      width: 100%;
-      height: 100%;
-    }
+    #clock { font-size: 25vw; text-align: center; margin: 20px 0 10px 0; }
+    .columns { display: flex; width: 100%; height: 100%; }
     .left, .right {
-      flex: 1;
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      padding-top: 30px;
+      flex: 1; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 30px;
+      transition: background-color 0.6s ease, color 0.6s ease;
     }
-    .weather-icon {
-      width: 100%;
-      height: auto;
-      filter: drop-shadow(0 0 4px black);
-      position: absolute;
-      top: 0;
-      left: 0;
-      z-index: 0;
-    }
-    .temp-now, .temp-forecast {
-      font-size: 8vw;
-      position: absolute;
-      top: 50%;
-      width: 100%;
-      text-align: center;
-      z-index: 1;
-      margin-top: 20px;
-    }
-    .forecast-time {
-      font-size: 5vw;
-      margin-top: 10px;
-      opacity: 0.8;
-    }
+    .weather-icon { width: 100%; height: auto; filter: drop-shadow(0 0 4px black); position: absolute; top: 0; left: 0; z-index: 0; }
+    .temp-now, .temp-forecast { font-size: 8vw; position: absolute; top: 50%; width: 100%; text-align: center; z-index: 1; margin-top: 20px; }
+    .forecast-time { font-size: 5vw; margin-top: 10px; opacity: 0.8; }
   </style>
 
-
-
-
-
-
-
-
-
-
-
-
-<style>
-  .color-scale-container {
-    position: absolute;
-    top: 10px;
-    left: 10%;
-    width: 80%;
-    height: 30px;
-    display: flex;
-    justify-content: space-between;
-    z-index: 10;
-  }
-  .color-segment-wrapper {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    flex: 1;
-  }
-  .color-segment {
-    width: 100%;
-    height: 6px;
-  }
-  .temp-label {
-    font-size: 10px;
-    color: black;
-    margin-top: 2px;
-  }
-  .temp-indicator-now {
-    position: absolute;
-    top: 6px;
-    width: 10px;
-    height: 10px;
-    background-color: red;
-    border-radius: 50%;
-    z-index: 11;
-  }
-  .temp-indicator-forecast {
-    position: absolute;
-    top: 6px;
-    width: 10px;
-    height: 10px;
-    background-color: black;
-    border-radius: 50%;
-    z-index: 11;
-  }
-</style>
-
+  <style>
+    .color-scale-container { position: absolute; top: 10px; left: 10%; width: 80%; height: 30px; display: flex; justify-content: space-between; z-index: 10; }
+    .color-segment-wrapper { display: flex; flex-direction: column; align-items: center; flex: 1; }
+    .color-segment { width: 100%; height: 6px; }
+    .temp-label { font-size: 10px; color: black; margin-top: 2px; }
+    .temp-indicator-now, .temp-indicator-forecast { position: absolute; top: 6px; width: 10px; height: 10px; border-radius: 50%; z-index: 11; }
+    .temp-indicator-now { background-color: red; }
+    .temp-indicator-forecast { background-color: black; }
+  </style>
+  <style>
+    :root { --left-bg: #ffffff; --right-bg: #ffffff; }
+    body { position: relative; }
+    /* Fullscreen delad bakgrund (vänster = nu, höger = prognos) */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(to right, var(--left-bg, #ffffff) 0 50%, var(--right-bg, #ffffff) 50% 100%);
+      z-index: -1; /* lägg bakom allt innehåll */
+    }
+  </style>
 </head>
 <body>
 
 <div id="temp-indicator-now" class="temp-indicator-now"></div>
 <div id="temp-indicator-forecast" class="temp-indicator-forecast"></div>
 
-
 <div class="color-scale-container">
-  
-    <div class="color-segment-wrapper">
-      <div class="color-segment" style="background-color:#001d4a;"></div>
-      <div class="temp-label">-20°</div>
-    </div>
-    
-    <div class="color-segment-wrapper">
-      <div class="color-segment" style="background-color:#003b8b;"></div>
-      <div class="temp-label">-15°</div>
-    </div>
-    
-    <div class="color-segment-wrapper">
-      <div class="color-segment" style="background-color:#005fc1;"></div>
-      <div class="temp-label">-10°</div>
-    </div>
-    
-    <div class="color-segment-wrapper">
-      <div class="color-segment" style="background-color:#3399ff;"></div>
-      <div class="temp-label">-5°</div>
-    </div>
-    
-    <div class="color-segment-wrapper">
-      <div class="color-segment" style="background-color:#33cccc;"></div>
-      <div class="temp-label">0°</div>
-    </div>
-    
-    <div class="color-segment-wrapper">
-      <div class="color-segment" style="background-color:#66ffcc;"></div>
-      <div class="temp-label">5°</div>
-    </div>
-    
-    <div class="color-segment-wrapper">
-      <div class="color-segment" style="background-color:#a8e6cf;"></div>
-      <div class="temp-label">10°</div>
-    </div>
-    
-    <div class="color-segment-wrapper">
-      <div class="color-segment" style="background-color:#66bb6a;"></div>
-      <div class="temp-label">15°</div>
-    </div>
-    
-    <div class="color-segment-wrapper">
-      <div class="color-segment" style="background-color:#cddc39;"></div>
-      <div class="temp-label">20°</div>
-    </div>
-    
-    <div class="color-segment-wrapper">
-      <div class="color-segment" style="background-color:#fff176;"></div>
-      <div class="temp-label">23°</div>
-    </div>
-    
-    <div class="color-segment-wrapper">
-      <div class="color-segment" style="background-color:#ffc107;"></div>
-      <div class="temp-label">26°</div>
-    </div>
-    
-    <div class="color-segment-wrapper">
-      <div class="color-segment" style="background-color:#ff9800;"></div>
-      <div class="temp-label">30°</div>
-    </div>
-    
-    <div class="color-segment-wrapper">
-      <div class="color-segment" style="background-color:#ff5722;"></div>
-      <div class="temp-label">35°</div>
-    </div>
-    
-    <div class="color-segment-wrapper">
-      <div class="color-segment" style="background-color:#f44336;"></div>
-      <div class="temp-label">40°</div>
-    </div>
-    
+  <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#001d4a;"></div><div class="temp-label">-20°</div></div>
+  <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#003b8b;"></div><div class="temp-label">-15°</div></div>
+  <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#005fc1;"></div><div class="temp-label">-10°</div></div>
+  <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#3399ff;"></div><div class="temp-label">-5°</div></div>
+  <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#33cccc;"></div><div class="temp-label">0°</div></div>
+  <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#66ffcc;"></div><div class="temp-label">5°</div></div>
+  <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#a8e6cf;"></div><div class="temp-label">10°</div></div>
+  <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#66bb6a;"></div><div class="temp-label">15°</div></div>
+  <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#cddc39;"></div><div class="temp-label">20°</div></div>
+  <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#fff176;"></div><div class="temp-label">23°</div></div>
+  <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#ffc107;"></div><div class="temp-label">26°</div></div>
+  <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#ff9800;"></div><div class="temp-label">30°</div></div>
+  <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#ff5722;"></div><div class="temp-label">35°</div></div>
+  <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#f44336;"></div><div class="temp-label">40°</div></div>
 </div>
-<div id="temp-indicator" class="temp-indicator"></div>
 
-<div class="color-scale-container"><div class="color-segment" style="background-color:#001d4a;"></div><div class="color-segment" style="background-color:#003b8b;"></div><div class="color-segment" style="background-color:#005fc1;"></div><div class="color-segment" style="background-color:#3399ff;"></div><div class="color-segment" style="background-color:#33cccc;"></div><div class="color-segment" style="background-color:#66ffcc;"></div><div class="color-segment" style="background-color:#a8e6cf;"></div><div class="color-segment" style="background-color:#66bb6a;"></div><div class="color-segment" style="background-color:#cddc39;"></div><div class="color-segment" style="background-color:#fff176;"></div><div class="color-segment" style="background-color:#ffc107;"></div><div class="color-segment" style="background-color:#ff9800;"></div><div class="color-segment" style="background-color:#ff5722;"></div><div class="color-segment" style="background-color:#f44336;"></div></div><div id="temp-indicator" class="temp-indicator"></div>
-  <div id="clock">--:--</div>
+<div id="clock">--:--</div>
 
-  <div class="columns">
-    <div class="left">
-      <img id="now-icon" src="" class="weather-icon" alt="väder nu">
-      <div id="temp-now" class="temp-now">-- °C</div>
-    </div>
-    <div class="right">
-      <img id="forecast-icon" src="" class="weather-icon" alt="prognos">
-      <div id="forecast-time" class="forecast-time">--:--</div>
-      <div id="temp-forecast" class="temp-forecast">-- °C</div>
-    </div>
+<div class="columns">
+  <div class="left">
+    <img id="now-icon" src="" class="weather-icon" alt="väder nu">
+    <div id="temp-now" class="temp-now">-- °C</div>
   </div>
-
-  <script>
-    function updateClock() {
-      const now = new Date();
-      const time = now.toLocaleTimeString('sv-SE', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      });
-      document.getElementById('clock').textContent = time;
-    }
-
-    function hexToRgb(hex) {
-      const bigint = parseInt(hex.slice(1), 16);
-      return {
-        r: (bigint >> 16) & 255,
-        g: (bigint >> 8) & 255,
-        b: bigint & 255
-      };
-    }
-
-    function getTextColorForBackground(hex) {
-      const { r, g, b } = hexToRgb(hex);
-      const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-      return luminance > 186 ? 'black' : 'white';
-    }
-
-    function getBackgroundColor(temp) {
-      if (temp <= -20)         return '#001d4a';
-      else if (temp <= -15)    return '#003b8b';
-      else if (temp <= -10)    return '#005fc1';
-      else if (temp <= -5)     return '#3399ff';
-      else if (temp <= 0)      return '#33cccc';
-      else if (temp <= 5)      return '#66ffcc';
-      else if (temp <= 10)     return '#a8e6cf';
-      else if (temp <= 15)     return '#66bb6a';
-      else if (temp <= 20)     return '#cddc39';
-      else if (temp <= 23)     return '#fff176';
-      else if (temp <= 26)     return '#ffc107';
-      else if (temp <= 30)     return '#ff9800';
-      else if (temp <= 35)     return '#ff5722';
-      else                     return '#f44336';
-    }
-
-    async function fetchWeather() {
-      const apiKey = '520bfebd2e95a6b1a08befe3286c9ca1';
-      const city = 'Bromma,SE';
-      const urlNow = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric`;
-      const urlForecast = `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${apiKey}&units=metric`;
-
-      try {
-        const resNow = await fetch(urlNow);
-        const dataNow = await resNow.json();
-        const tempNow = Math.round(dataNow.main.temp);
-        const iconNow = dataNow.weather[0].icon;
-        document.getElementById('temp-now').textContent = `${tempNow} °C`;
-        document.getElementById('now-icon').src = `https://openweathermap.org/img/wn/${iconNow}@4x.png`;
-
-        const bg = getBackgroundColor(tempNow);
-        const fg = getTextColorForBackground(bg);
-        document.body.style.backgroundColor = bg;
-        document.body.style.color = fg;
-
-        const resForecast = await fetch(urlForecast);
-        const dataForecast = await resForecast.json();
-        const forecast = dataForecast.list[1];
-        const tempForecast = Math.round(forecast.main.temp);
-        const iconForecast = forecast.weather[0].icon;
-        const time = new Date(forecast.dt * 1000).toLocaleTimeString('sv-SE', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-        });
-
-        document.getElementById('temp-forecast').textContent = `${tempForecast}°C`;
-        document.getElementById('forecast-icon').src = `https://openweathermap.org/img/wn/${iconForecast}@4x.png`;
-        document.getElementById('forecast-time').textContent = time;
-
-      } catch (err) {
-        console.error("Fel vid hämtning:", err);
-      }
-    }
-
-    updateClock();
-    fetchWeather();
-    setInterval(updateClock, 1000);
-    setInterval(fetchWeather, 10 * 60 * 1000);
-  </script>
-
-
-
-
-
+  <div class="right">
+    <img id="forecast-icon" src="" class="weather-icon" alt="prognos">
+    <div id="forecast-time" class="forecast-time">--:--</div>
+    <div id="temp-forecast" class="temp-forecast">-- °C</div>
+  </div>
+</div>
 
 <script>
-  function updateTempIndicator(tempC) {
-    const minTemp = -20;
-    const maxTemp = 40;
-    const scaleContainer = document.querySelector('.color-scale-container');
-    const indicator = document.getElementById('temp-indicator');
-    if (!scaleContainer || !indicator) return;
-
-    const fullWidth = scaleContainer.offsetWidth;
-    const relative = Math.min(Math.max((tempC - minTemp) / (maxTemp - minTemp), 0), 1);
-    const pixelPos = relative * fullWidth;
-    indicator.style.left = `calc(10% + ${pixelPos - 4}px)`;
+  function updateClock() {
+    const now = new Date();
+    const time = now.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', hour12: false });
+    document.getElementById('clock').textContent = time;
   }
 
-  const waitForTemp = setInterval(() => {
-    const el = document.getElementById('temp-now');
-    if (el && el.textContent) {
-      const match = el.textContent.match(/-?\d+(\.\d+)?/);
-      if (match) {
-        updateTempIndicator(parseFloat(match[0]));
-        clearInterval(waitForTemp);
-      }
+  function hexToRgb(hex) {
+    const bigint = parseInt(hex.slice(1), 16);
+    return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+  }
+
+  function getTextColorForBackground(hex) {
+    const { r, g, b } = hexToRgb(hex);
+    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+    return luminance > 186 ? 'black' : 'white';
+  }
+
+  function getBackgroundColor(temp) {
+    if (temp <= -20) return '#001d4a';
+    else if (temp <= -15) return '#003b8b';
+    else if (temp <= -10) return '#005fc1';
+    else if (temp <= -5) return '#3399ff';
+    else if (temp <= 0) return '#33cccc';
+    else if (temp <= 5) return '#66ffcc';
+    else if (temp <= 10) return '#a8e6cf';
+    else if (temp <= 15) return '#66bb6a';
+    else if (temp <= 20) return '#cddc39';
+    else if (temp <= 23) return '#fff176';
+    else if (temp <= 26) return '#ffc107';
+    else if (temp <= 30) return '#ff9800';
+    else if (temp <= 35) return '#ff5722';
+    else return '#f44336';
+  }
+
+  async function fetchWeather() {
+    const apiKey = '520bfebd2e95a6b1a08befe3286c9ca1';
+    const city = 'Bromma,SE';
+    const urlNow = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric`;
+    const urlForecast = `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${apiKey}&units=metric`;
+
+    try {
+      // NU
+      const resNow = await fetch(urlNow);
+      const dataNow = await resNow.json();
+      const tempNow = Math.round(dataNow.main.temp);
+      const iconNow = dataNow.weather[0].icon;
+      document.getElementById('temp-now').textContent = `${tempNow} °C`;
+      document.getElementById('now-icon').src = `https://openweathermap.org/img/wn/${iconNow}@4x.png`;
+
+      // Sätt vänster bakgrund + textfärg efter aktuell temp
+      const left = document.querySelector('.left');
+      const bgNow = getBackgroundColor(tempNow);
+      const fgNow = getTextColorForBackground(bgNow);
+      document.documentElement.style.setProperty('--left-bg', bgNow);
+      left.style.backgroundColor = 'transparent';
+      left.style.color = fgNow;
+
+      // PROGNOS (närmsta steg framåt)
+      const resForecast = await fetch(urlForecast);
+      const dataForecast = await resForecast.json();
+      const forecast = dataForecast.list[1];
+      const tempForecast = Math.round(forecast.main.temp);
+      const iconForecast = forecast.weather[0].icon;
+      const time = new Date(forecast.dt * 1000).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+      document.getElementById('temp-forecast').textContent = `${tempForecast}°C`;
+      document.getElementById('forecast-icon').src = `https://openweathermap.org/img/wn/${iconForecast}@4x.png`;
+      document.getElementById('forecast-time').textContent = time;
+
+      // Sätt höger bakgrund + textfärg efter prognostemp
+      const right = document.querySelector('.right');
+      const bgFc = getBackgroundColor(tempForecast);
+      const fgFc = getTextColorForBackground(bgFc);
+      document.documentElement.style.setProperty('--right-bg', bgFc);
+      right.style.backgroundColor = 'transparent';
+      right.style.color = fgFc;
+
+    } catch (err) {
+      console.error('Fel vid hämtning:', err);
     }
-  }, 300);
+  }
+
+  updateClock();
+  fetchWeather();
+  setInterval(updateClock, 1000);
+  setInterval(fetchWeather, 10 * 60 * 1000);
 </script>
 
-
 <script>
+  // Skala-indikatorer (oförändrat)
   function setTempIndicator(id, tempC) {
-    const minTemp = -20;
-    const maxTemp = 40;
+    const minTemp = -20; const maxTemp = 40;
     const scaleContainer = document.querySelector('.color-scale-container');
     const indicator = document.getElementById(id);
     if (!scaleContainer || !indicator) return;
-
     const fullWidth = scaleContainer.offsetWidth;
     const relative = Math.min(Math.max((tempC - minTemp) / (maxTemp - minTemp), 0), 1);
     const pixelPos = relative * fullWidth;
