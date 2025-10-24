@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Väderklocka</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     * { box-sizing: border-box; }
     body {
@@ -15,8 +16,9 @@
       background: #ffffff;
       color: #000000;
       transition: background-color 1s ease, color 1s ease;
+      position: relative;
     }
-    #clock { font-size: 25vw; text-align: center; margin: 20px 0 10px 0; }
+    #clock { font-size: 25vw; text-align: center; margin: 20px 0 10px 0; line-height: .9; }
     .columns { display: flex; width: 100%; height: 100%; }
     .left, .right {
       flex: 1; position: relative; display: flex; flex-direction: column;
@@ -49,7 +51,6 @@
     .temp-indicator-forecast { background-color: black; }
 
     :root { --left-bg: #ffffff; --right-bg: #ffffff; }
-    body { position: relative; }
     body::before {
       content: '';
       position: fixed;
@@ -59,6 +60,15 @@
         var(--right-bg, #ffffff) 50% 100%);
       z-index: -1;
     }
+
+    /* Test-knapp (diskret) */
+    .test-speak {
+      position: fixed; right: 12px; bottom: 12px;
+      padding: 10px 14px; border: 0; border-radius: 10px;
+      background: #111; color: #fff; cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0,0,0,.2); opacity: .8;
+    }
+    .test-speak:hover { opacity: 1; }
   </style>
 </head>
 <body>
@@ -97,24 +107,26 @@
   </div>
 </div>
 
+<button class="test-speak" id="btn-test">Testa tal nu</button>
+
 <script>
+  // ----- Klocka -----
   function updateClock() {
     const now = new Date();
     const time = now.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', hour12: false });
     document.getElementById('clock').textContent = time;
   }
 
+  // ----- Färgverktyg -----
   function hexToRgb(hex) {
     const bigint = parseInt(hex.slice(1), 16);
     return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
   }
-
   function getTextColorForBackground(hex) {
     const { r, g, b } = hexToRgb(hex);
     const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
     return luminance > 186 ? 'black' : 'white';
   }
-
   function getBackgroundColor(temp) {
     if (temp <= -20) return '#001d4a';
     else if (temp <= -15) return '#003b8b';
@@ -132,26 +144,29 @@
     else return '#f44336';
   }
 
-  async function fetchWeather() {
+  // ----- Väderhämtning + UI-uppdatering -----
+  async function updateUIAndGetData() {
     const apiKey = '520bfebd2e95a6b1a08befe3286c9ca1';
     const city = 'Bromma,SE';
-    const urlNow = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric`;
-    const urlForecast = `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${apiKey}&units=metric`;
+    const urlNow = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=sv`;
+    const urlForecast = `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${apiKey}&units=metric&lang=sv`;
 
     try {
-      // NU
-      const resNow = await fetch(urlNow);
+      const [resNow, resForecast] = await Promise.all([fetch(urlNow), fetch(urlForecast)]);
       const dataNow = await resNow.json();
+      const dataForecast = await resForecast.json();
+
+      // NU
       const tempNow = Math.round(dataNow.main.temp);
       const iconNow = dataNow.weather[0].icon;
       document.getElementById('temp-now').textContent = `${tempNow} °C`;
       document.getElementById('now-icon').src = `https://openweathermap.org/img/wn/${iconNow}@4x.png`;
 
-      // Sätt färg på aktuell temp (blå ≤ 0, annars röd)
+      // Färg på siffror (vänster)
       const tempNowEl = document.getElementById('temp-now');
       tempNowEl.style.color = tempNow <= 0 ? '#3399ff' : '#e60000';
 
-      // Sätt vänster bakgrund
+      // Bakgrund (vänster)
       const left = document.querySelector('.left');
       const bgNow = getBackgroundColor(tempNow);
       const fgNow = getTextColorForBackground(bgNow);
@@ -159,9 +174,7 @@
       left.style.backgroundColor = 'transparent';
       left.style.color = fgNow;
 
-      // PROGNOS
-      const resForecast = await fetch(urlForecast);
-      const dataForecast = await resForecast.json();
+      // PROGNOS (närmsta steg framåt)
       const forecast = dataForecast.list[1];
       const tempForecast = Math.round(forecast.main.temp);
       const iconForecast = forecast.weather[0].icon;
@@ -171,11 +184,11 @@
       document.getElementById('forecast-icon').src = `https://openweathermap.org/img/wn/${iconForecast}@4x.png`;
       document.getElementById('forecast-time').textContent = time;
 
-      // Sätt färg på prognos (blå ≤ 0, annars röd)
+      // Färg på siffror (höger)
       const tempForecastEl = document.getElementById('temp-forecast');
       tempForecastEl.style.color = tempForecast <= 0 ? '#3399ff' : '#e60000';
 
-      // Sätt höger bakgrund
+      // Bakgrund (höger)
       const right = document.querySelector('.right');
       const bgFc = getBackgroundColor(tempForecast);
       const fgFc = getTextColorForBackground(bgFc);
@@ -183,19 +196,24 @@
       right.style.backgroundColor = 'transparent';
       right.style.color = fgFc;
 
+      // Flytta indikatorprickarna på skalan
+      setTempIndicator('temp-indicator-now', tempNow);
+      setTempIndicator('temp-indicator-forecast', tempForecast);
+
+      // Returnera data för talsammanfattning
+      const nowDesc = (dataNow.weather?.[0]?.description || "").toLowerCase();
+      return {
+        nowTemp: dataNow.main.temp,
+        nowDesc,
+        forecastList: dataForecast.list
+      };
     } catch (err) {
       console.error('Fel vid hämtning:', err);
+      throw err;
     }
   }
 
-  updateClock();
-  fetchWeather();
-  setInterval(updateClock, 1000);
-  setInterval(fetchWeather, 10 * 60 * 1000);
-</script>
-
-<script>
-  // Skala-indikatorer
+  // ----- Skala-indikatorer -----
   function setTempIndicator(id, tempC) {
     const minTemp = -20; const maxTemp = 40;
     const scaleContainer = document.querySelector('.color-scale-container');
@@ -207,19 +225,126 @@
     indicator.style.left = `calc(10% + ${pixelPos - 5}px)`;
   }
 
-  const waitForTemps = setInterval(() => {
-    const nowEl = document.getElementById('temp-now');
-    const forecastEl = document.getElementById('temp-forecast');
-    if (nowEl && forecastEl && nowEl.textContent && forecastEl.textContent) {
-      const nowMatch = nowEl.textContent.match(/-?\d+(\.\d+)?/);
-      const forecastMatch = forecastEl.textContent.match(/-?\d+(\.\d+)?/);
-      if (nowMatch && forecastMatch) {
-        setTempIndicator('temp-indicator-now', parseFloat(nowMatch[0]));
-        setTempIndicator('temp-indicator-forecast', parseFloat(forecastMatch[0]));
-        clearInterval(waitForTemps);
-      }
+  // ----- Tal (Web Speech API) -----
+  function speak(text) {
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "sv-SE";
+      u.rate = 1.0;
+      u.pitch = 1.0;
+      speechSynthesis.cancel(); // avbryt ev. pågående
+      speechSynthesis.speak(u);
+    } catch(e) {
+      console.warn("Kunde inte tala:", e);
     }
-  }, 300);
+  }
+  function trendWord(delta) {
+    const a = Math.abs(delta);
+    if (a < 0.6) return "vara ungefär oförändrad";
+    return delta > 0 ? "stiga" : "sjunka";
+  }
+  function summarizeToday(nowTemp, nowDesc, forecastList) {
+    if (!forecastList || !forecastList.length) {
+      return { text: `Just nu är det ${Math.round(nowTemp)} grader och ${nowDesc}.` };
+    }
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+
+    const today = forecastList.filter(item => {
+      const t = new Date(item.dt * 1000);
+      return t.getFullYear() === y && t.getMonth() === m && t.getDate() === d;
+    });
+    const daySet = today.length ? today : forecastList.slice(0, Math.min(8, forecastList.length));
+
+    const temps = daySet.map(i => i.main.temp);
+    const tMin = Math.min(...temps);
+    const tMax = Math.max(...temps);
+
+    let tNoon = null, bestDiff = Infinity;
+    for (const i of daySet) {
+      const t = new Date(i.dt * 1000);
+      const diff = Math.abs(t.getHours() + t.getMinutes()/60 - 12);
+      if (diff < bestDiff) { bestDiff = diff; tNoon = i.main.temp; }
+    }
+
+    const delta = (tMax + tMin)/2 - nowTemp; // grov riktning
+    const trend = trendWord(delta);
+
+    const text =
+      `Just nu är det ${Math.round(nowTemp)} grader och ${nowDesc}. ` +
+      `Under dagen väntas som lägst ${Math.round(tMin)} och som högst ${Math.round(tMax)} grader, ` +
+      `och temperaturen ser ut att ${trend}.` +
+      (tNoon != null ? ` Runt lunchtid cirka ${Math.round(tNoon)} grader.` : "");
+
+    return { text };
+  }
+
+  async function announceOnce() {
+    try {
+      const data = await updateUIAndGetData(); // uppdaterar UI och hämtar färsk data
+      const { text } = summarizeToday(data.nowTemp, data.nowDesc, data.forecastList);
+      speak(text);
+    } catch (e) {
+      console.warn("Kunde inte göra röstannons:", e);
+    }
+  }
+
+  // ----- Schema för automatiskt tal -----
+  (function scheduleAnnouncements() {
+    let lastStamp = "";
+    let lastDay = (new Date()).getDate();
+
+    setInterval(() => {
+      const now = new Date();
+      const day = now.getDate();
+      if (day !== lastDay) { lastStamp = ""; lastDay = day; }
+
+      const dow = now.getDay(); // 0=sön ... 6=lör
+      const h = now.getHours();
+      const m = now.getMinutes();
+      const stamp = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()} ${h}:${m}`;
+
+      const isWeekday = dow >= 1 && dow <= 5;
+      const isWeekend = dow === 0 || dow === 6;
+
+      let shouldSpeak = false;
+
+      // Vardagar: 06:30, 06:40, 06:50, 07:00
+      if (isWeekday) {
+        if ((h === 6 && (m === 30 || m === 40 || m === 50)) || (h === 7 && m === 0)) {
+          shouldSpeak = true;
+        }
+      }
+      // Helger: 09:00 (en gång)
+      if (isWeekend) {
+        if (h === 9 && m === 0) {
+          shouldSpeak = true;
+        }
+      }
+      // Alla dagar: 18:00 (en gång)
+      if (h === 18 && m === 0) {
+        shouldSpeak = true;
+      }
+
+      if (shouldSpeak && stamp !== lastStamp) {
+        lastStamp = stamp;
+        announceOnce();
+      }
+    }, 15000); // kontroll var 15:e sekund
+  })();
+
+  // ----- Init + intervaller -----
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // Första laddningen + uppdatera var 10:e minut
+  updateUIAndGetData();
+  setInterval(updateUIAndGetData, 10 * 60 * 1000);
+
+  // Test-knapp: prata direkt
+  document.getElementById('btn-test').addEventListener('click', () => {
+    announceOnce();
+  });
 </script>
 
 </body>
