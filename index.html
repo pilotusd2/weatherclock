@@ -2,122 +2,88 @@
 <html lang="sv">
 <head>
   <meta charset="UTF-8" />
-  <title>Väderklocka</title>
+  <title>Väderklocka (med TTS-fallback)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     * { box-sizing: border-box; }
     html, body { height: 100%; }
     body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-      background: #ffffff;
-      color: #000000;
-      transition: background-color 1s ease, color 1s ease;
-      position: relative;
-      -webkit-tap-highlight-color: rgba(0,0,0,0);
-      touch-action: manipulation;
+      margin: 0; font-family: Arial, sans-serif;
+      display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+      background: #ffffff; color: #000; position: relative;
+      -webkit-tap-highlight-color: transparent; touch-action: manipulation;
     }
     #clock { font-size: 25vw; text-align: center; margin: 20px 0 10px 0; line-height: .9; }
     .columns { display: flex; width: 100%; height: 100%; }
     .left, .right {
       flex: 1; position: relative; display: flex; flex-direction: column;
       align-items: center; justify-content: flex-start; padding-top: 30px;
-      transition: background-color 0.6s ease, color 0.6s ease;
+      transition: background-color .6s ease, color .6s ease;
     }
-    .weather-icon {
-      width: 100%; height: auto; filter: drop-shadow(0 0 4px black);
-      position: absolute; top: 0; left: 0; z-index: 0;
-      pointer-events: none;
-    }
+    .weather-icon { width: 100%; height: auto; filter: drop-shadow(0 0 4px black);
+      position: absolute; top: 0; left: 0; z-index: 0; pointer-events: none; }
     .temp-now, .temp-forecast {
       font-size: 8vw; position: absolute; top: 50%; width: 100%;
-      text-align: center; z-index: 1; margin-top: 20px;
-      text-shadow: 0 0 6px rgba(0,0,0,.35);
+      text-align: center; z-index: 1; margin-top: 20px; text-shadow: 0 0 6px rgba(0,0,0,.35);
     }
-    .forecast-time { font-size: 5vw; margin-top: 10px; opacity: 0.8; }
+    .forecast-time { font-size: 5vw; margin-top: 10px; opacity: .8; }
 
     .color-scale-container { position: absolute; top: 10px; left: 10%;
-      width: 80%; height: 30px; display: flex; justify-content: space-between; z-index: 10;
-    }
+      width: 80%; height: 30px; display: flex; justify-content: space-between; z-index: 10; }
     .color-segment-wrapper { display: flex; flex-direction: column; align-items: center; flex: 1; }
     .color-segment { width: 100%; height: 6px; }
     .temp-label { font-size: 10px; color: black; margin-top: 2px; }
     .temp-indicator-now, .temp-indicator-forecast {
-      position: absolute; top: 6px; width: 10px; height: 10px;
-      border-radius: 50%; z-index: 11;
-    }
+      position: absolute; top: 6px; width: 10px; height: 10px; border-radius: 50%; z-index: 11; }
     .temp-indicator-now { background-color: red; }
     .temp-indicator-forecast { background-color: black; }
 
-    :root { --left-bg: #ffffff; --right-bg: #ffffff; }
+    :root { --left-bg:#fff; --right-bg:#fff; }
     body::before {
-      content: ''; position: fixed; inset: 0; z-index: -1;
-      background: linear-gradient(to right,
-        var(--left-bg, #ffffff) 0 50%,
-        var(--right-bg, #ffffff) 50% 100%);
+      content:''; position:fixed; inset:0; z-index:-1;
+      background: linear-gradient(to right, var(--left-bg, #fff) 0 50%, var(--right-bg, #fff) 50% 100%);
     }
 
-    /* Testknapp */
     .test-speak {
-      position: fixed;
-      right: calc(12px + env(safe-area-inset-right));
+      position: fixed; right: calc(12px + env(safe-area-inset-right));
       bottom: calc(12px + env(safe-area-inset-bottom));
-      padding: 12px 16px;
-      min-width: 180px; min-height: 48px;
-      border: 0; border-radius: 12px;
-      background: #111; color: #fff; cursor: pointer;
-      box-shadow: 0 4px 10px rgba(0,0,0,.2);
-      opacity: .95; z-index: 10000;
-      pointer-events: auto;
-      font-size: 16px;
+      padding: 12px 16px; min-width: 180px; min-height: 48px;
+      border: 0; border-radius: 12px; background:#111; color:#fff; cursor:pointer;
+      box-shadow: 0 4px 10px rgba(0,0,0,.2); opacity:.95; z-index:10000; font-size:16px;
     }
-    .test-speak:active { transform: scale(0.98); }
 
-    /* Röstpanel */
+    /* Röstpanel (frivillig) */
     .voice-panel {
       position: fixed; left: 12px; bottom: 12px; z-index: 10000;
-      background: rgba(0,0,0,0.85); color: #fff;
-      padding: 10px; border-radius: 12px; max-width: 80vw; font-size: 12px;
+      background: rgba(0,0,0,0.85); color:#fff; padding:10px; border-radius:12px; max-width:80vw; font-size:12px;
     }
-    .voice-panel select, .voice-panel input[type="range"], .voice-panel button { width: 100%; }
-    .voice-panel button {
-      margin-top: 6px; padding: 6px 8px; border-radius: 8px; border: 0; background: #1e88e5; color: #fff;
-    }
+    .voice-panel select, .voice-panel input[type="range"], .voice-panel button { width:100%; }
+    .voice-panel button { margin-top:6px; padding:6px 8px; border-radius:8px; border:0; background:#1e88e5; color:#fff; }
 
-    /* HELSKÄRMS-OVERLAY FÖR LJUDAKTIVERING */
+    /* Ljud-aktiveringsoverlay */
     #tap-unlock {
-      position: fixed; inset: 0; z-index: 20000;
-      display: flex; align-items: center; justify-content: center;
-      background: #000; color: #fff;
+      position: fixed; inset:0; z-index: 20000; display:flex; align-items:center; justify-content:center;
+      background:#000; color:#fff;
     }
     #tap-unlock button {
-      font-size: 20px; padding: 16px 22px; border-radius: 14px; border: none; cursor: pointer;
-      background: #1e88e5; color: #fff;
+      font-size: 20px; padding: 16px 22px; border-radius: 14px; border: none; cursor: pointer; background:#1e88e5; color:#fff;
     }
 
-    /* Liten statusrad */
     #status {
-      position: fixed; left: 50%; transform: translateX(-50%);
+      position: fixed; left:50%; transform:translateX(-50%);
       bottom: calc(70px + env(safe-area-inset-bottom));
-      background: rgba(0,0,0,.8); color: #fff; padding: 6px 10px;
-      border-radius: 8px; font-size: 12px; z-index: 10000; min-width: 160px; text-align: center;
+      background: rgba(0,0,0,.8); color:#fff; padding:6px 10px; border-radius:8px; font-size:12px; z-index:10000;
     }
+    #status[hidden]{ display:none; }
   </style>
 </head>
 <body>
 
-<!-- Helskärms-knapp: MÅSTE tryckas en gång på iPad/Chrome -->
-<div id="tap-unlock">
-  <button id="btn-unlock" type="button">🔊 Tryck för att aktivera ljud</button>
-</div>
-
+<!-- Overlay för att låsa upp ljud -->
+<div id="tap-unlock"><button id="btn-unlock" type="button">🔊 Tryck för att aktivera ljud</button></div>
 <div id="status" hidden>status…</div>
 
-<!-- Skala & indikatorer -->
+<!-- Skala -->
 <div id="temp-indicator-now" class="temp-indicator-now"></div>
 <div id="temp-indicator-forecast" class="temp-indicator-forecast"></div>
 <div class="color-scale-container">
@@ -137,7 +103,7 @@
   <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#f44336;"></div><div class="temp-label">40°</div></div>
 </div>
 
-<!-- Klocka & kolumner -->
+<!-- Klocka & väder -->
 <div id="clock">--:--</div>
 <div class="columns">
   <div class="left">
@@ -152,11 +118,11 @@
 </div>
 
 <!-- Testknapp -->
-<button class="test-speak" id="btn-test" type="button" aria-label="Testa tal nu">🔊 Testa tal nu</button>
+<button class="test-speak" id="btn-test" type="button">🔊 Testa tal nu</button>
 
-<!-- Röstpanel -->
+<!-- Röstpanel (frivillig) -->
 <div class="voice-panel">
-  <div style="margin-bottom:6px">Röst:</div>
+  <div style="margin-bottom:6px">Röst (om Web Speech finns):</div>
   <select id="voice-select"><option>laddar röster…</option></select>
   <label>Hastighet <input id="rate" type="range" min="0.6" max="1.4" step="0.05" value="1.0"></label>
   <label>Tonhöjd <input id="pitch" type="range" min="0.8" max="1.2" step="0.05" value="1.0"></label>
@@ -164,12 +130,18 @@
   <div id="voice-info" style="margin-top:6px;opacity:.8">Vald: okänd</div>
 </div>
 
+<!-- Osynlig audio för fallback -->
+<audio id="tts-audio" preload="none"></audio>
+
 <script>
+  /* ==== KONFIGURERA DIN VOICERSS-NYCKEL HÄR ==== */
+  const VOICE_RSS_KEY = "ER_SÄTT_MED_DIN_API_NYCKEL"; // <-- fyll i!
+
   /* ===== KLOCKA ===== */
   function updateClock() {
     const now = new Date();
-    const time = now.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', hour12: false });
-    document.getElementById('clock').textContent = time;
+    document.getElementById('clock').textContent =
+      now.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', hour12: false });
   }
 
   /* ===== FÄRG/BG ===== */
@@ -236,139 +208,108 @@
     indicator.style.left = `calc(10% + ${pixelPos - 5}px)`;
   }
 
-  /* ===== TAL (svenska) ===== */
+  /* ===== TAL: Web Speech + Fallback till VoiceRSS ===== */
   let speechPrimed = false;
   let svVoice = null;
-  let audioCtx = null;
   let chosenVoiceName = localStorage.getItem("voiceName") || null;
   let chosenRate = parseFloat(localStorage.getItem("voiceRate") || "1.0");
   let chosenPitch = parseFloat(localStorage.getItem("voicePitch") || "1.0");
+  let audioCtx = null;
 
   function status(msg) {
     const s = document.getElementById('status');
-    if (!s) return;
-    s.textContent = msg;
-    s.hidden = false;
-    clearTimeout(status._t);
-    status._t = setTimeout(()=>{ s.hidden = true; }, 2500);
+    s.textContent = msg; s.hidden = false;
+    clearTimeout(status._t); status._t = setTimeout(()=>{ s.hidden = true; }, 2500);
   }
 
-  function listVoices() { return (speechSynthesis.getVoices() || []).slice(); }
-
-  function getChosenVoice() {
-    const voices = listVoices();
-    return voices.find(v => v.name === chosenVoiceName) || null;
+  function listVoices() { return (window.speechSynthesis ? speechSynthesis.getVoices() : []) || []; }
+  function hasSwedishVoice() {
+    return listVoices().some(v => (v.lang||"").toLowerCase().startsWith("sv"));
   }
-
-  function pickSwedishFemaleVoice() {
+  function pickSwedishVoice() {
     const voices = listVoices();
-    const norm = s => (s || "").toLowerCase();
-    const sv = voices.filter(v => norm(v.lang).startsWith("sv"));
     const femaleNames = ["alva","tove","siri","elin","maria","anna","klara","agnes"];
-    const svFemale = sv.find(v => femaleNames.some(n => norm(v.name).includes(n)));
-    if (svFemale) return svFemale;
-    const googleSv = sv.find(v => norm(v.name).includes("google"));
-    if (googleSv) return googleSv;
-    return sv[0] || voices[0] || null;
+    // svensk med kvinnligt klingande namn
+    for (let v of voices) {
+      const lang = (v.lang||"").toLowerCase();
+      const name = (v.name||"").toLowerCase();
+      if (lang.startsWith("sv") && femaleNames.some(n => name.includes(n))) return v;
+    }
+    // annars vilken svensk som helst
+    return voices.find(v => (v.lang||"").toLowerCase().startsWith("sv")) || null;
   }
 
-  // Helskärms-aktivering: MÅSTE ske synkront i samma tryck
-  function unlockAudioAndSpeech() {
+  // Aktivera ljud (måste ske i en gest)
+  function unlockAudio() {
     try {
-      // 1) WebAudio: starta och spela en snabb beep för att öppna ljudkanalen
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === "suspended") audioCtx.resume();
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.connect(g); g.connect(audioCtx.destination);
-      o.type = "sine"; o.frequency.value = 880;
+      // Liten beep för att säkerställa att ljudkanalen öppnas
+      const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+      o.connect(g); g.connect(audioCtx.destination); o.type="sine"; o.frequency.value=880;
       g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
       g.gain.exponentialRampToValueAtTime(0.05, audioCtx.currentTime + 0.01);
-      o.start();
-      o.stop(audioCtx.currentTime + 0.08);
-
-      // 2) TTS: kort svensk fras – i samma eventloop
-      svVoice = getChosenVoice() || pickSwedishFemaleVoice();
-      const u = new SpeechSynthesisUtterance("Tal aktiverat.");
-      if (svVoice) u.voice = svVoice;
-      u.lang = (svVoice && (svVoice.lang||"").toLowerCase().startsWith("sv")) ? svVoice.lang : "sv-SE";
-      u.volume = 1.0; u.rate = chosenRate || 1.0; u.pitch = chosenPitch || 1.0;
-      speechSynthesis.cancel();
-      speechSynthesis.speak(u);
-
-      speechPrimed = true;
-      status("Ljud aktiverat");
-
-      // Dölj overlay
-      const overlay = document.getElementById('tap-unlock');
-      if (overlay) overlay.style.display = 'none';
-
-      // När röster laddats: finjustera vald röst + UI
-      if (speechSynthesis.onvoiceschanged !== undefined) {
-        const once = () => { speechSynthesis.onvoiceschanged = null; populateVoiceSelect(); };
-        speechSynthesis.onvoiceschanged = once;
-      } else {
-        populateVoiceSelect();
-      }
-    } catch (e) {
-      console.warn("unlockAudioAndSpeech fel:", e);
-      status("Kunde inte aktivera ljud");
-    }
+      o.start(); o.stop(audioCtx.currentTime + 0.08);
+    } catch(e) { /* ignore */ }
   }
 
-function speak(text) {
-  if (document.visibilityState !== "visible" || !speechPrimed) return;
-  try {
-    const v = getChosenVoice() || svVoice;
-    const u = new SpeechSynthesisUtterance(text);
-    if (v && (v.lang || "").toLowerCase().startsWith("sv")) {
-      u.voice = v;
-      u.lang = v.lang;
-    } else {
-      // stoppa och visa instruktion om ingen svensk röst finns
-      status("Ingen svensk röst – installera i iOS Inställningar.");
+  function primeSpeechSync() {
+    unlockAudio();
+    if (window.speechSynthesis) {
+      svVoice = pickSwedishVoice();
+    }
+    speechPrimed = true;
+  }
+
+  // Web Speech (om svensk röst finns) annars VoiceRSS via <audio>
+  async function speak(text) {
+    if (!speechPrimed) { status("Tryck först på 'Aktivera ljud'"); return; }
+    if (document.visibilityState !== "visible") return;
+
+    // 1) Försök Web Speech med svensk röst
+    if (window.speechSynthesis && hasSwedishVoice()) {
+      try {
+        if (speechSynthesis.paused) speechSynthesis.resume();
+        const u = new SpeechSynthesisUtterance(text);
+        if (svVoice) u.voice = svVoice;
+        u.lang = "sv-SE"; u.volume = 1.0; u.rate = chosenRate || 1.0; u.pitch = chosenPitch || 1.0;
+        speechSynthesis.cancel(); speechSynthesis.speak(u);
+        return;
+      } catch(e) { console.warn("Web Speech fel, faller tillbaka:", e); }
+    }
+
+    // 2) Fallback: VoiceRSS (kräver VOICE_RSS_KEY)
+    if (!VOICE_RSS_KEY || VOICE_RSS_KEY === "ER_SÄTT_MED_DIN_API_NYCKEL") {
+      status("Sätt VOICE_RSS_KEY för tal-fallback");
       return;
     }
-    u.volume = 1.0; u.rate = chosenRate || 1.0; u.pitch = chosenPitch || 1.0;
-    speechSynthesis.cancel();
-    speechSynthesis.speak(u);
-  } catch(e) {
-    console.warn("Kunde inte tala:", e);
-  }
+    try {
+      const src = encodeURIComponent(text);
+      // f=44khz_16bit_stereo ger bra kvalitet. r = rate (-10..10), c = codec.
+      const url = `https://api.voicerss.org/?key=${encodeURIComponent(VOICE_RSS_KEY)}&hl=sv-se&src=${src}&f=44khz_16bit_stereo&c=mp3`;
+      const audio = document.getElementById('tts-audio');
+      audio.src = url;
+      await audio.play();
+    } catch(e) {
+      console.warn("VoiceRSS-fel:", e);
+      status("Kunde inte spela upp TTS-ljud");
+    }
   }
 
   /* ===== Sammanfattning ===== */
   function trendWord(delta) {
-    const a = Math.abs(delta);
-    if (a < 0.6) return "vara ungefär oförändrad";
+    const a = Math.abs(delta); if (a < 0.6) return "vara ungefär oförändrad";
     return delta > 0 ? "stiga" : "sjunka";
   }
   function summarizeToday(nowTemp, nowDesc, forecastList) {
-    if (!forecastList || !forecastList.length) {
-      return { text: `Just nu är det ${Math.round(nowTemp)} grader och ${nowDesc}.` };
-    }
-    const now = new Date();
-    const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
-    const today = forecastList.filter(item => {
-      const t = new Date(item.dt * 1000);
-      return t.getFullYear() === y && t.getMonth() === m && t.getDate() === d;
-    });
+    if (!forecastList || !forecastList.length) return { text: `Just nu är det ${Math.round(nowTemp)} grader och ${nowDesc}.` };
+    const now = new Date(); const y=now.getFullYear(), m=now.getMonth(), d=now.getDate();
+    const today = forecastList.filter(i => { const t=new Date(i.dt*1000); return t.getFullYear()===y && t.getMonth()===m && t.getDate()===d; });
     const daySet = today.length ? today : forecastList.slice(0, Math.min(8, forecastList.length));
-    const temps = daySet.map(i => i.main.temp);
-    const tMin = Math.min(...temps), tMax = Math.max(...temps);
-    let tNoon = null, bestDiff = Infinity;
-    for (const i of daySet) {
-      const t = new Date(i.dt * 1000);
-      const diff = Math.abs(t.getHours() + t.getMinutes()/60 - 12);
-      if (diff < bestDiff) { bestDiff = diff; tNoon = i.main.temp; }
-    }
-    const delta = (tMax + tMin)/2 - nowTemp;
-    const trend = trendWord(delta);
-    const text =
-      `Just nu är det ${Math.round(nowTemp)} grader och ${nowDesc}. ` +
-      `Under dagen väntas som lägst ${Math.round(tMin)} och som högst ${Math.round(tMax)} grader, ` +
-      `och temperaturen ser ut att ${trend}.` +
-      (tNoon != null ? ` Runt lunchtid cirka ${Math.round(tNoon)} grader.` : "");
+    const temps = daySet.map(i=>i.main.temp); const tMin=Math.min(...temps), tMax=Math.max(...temps);
+    let tNoon=null, diffBest=1e9; for (const i of daySet){const t=new Date(i.dt*1000); const diff=Math.abs(t.getHours()+t.getMinutes()/60-12); if (diff<diffBest){diffBest=diff; tNoon=i.main.temp;}}
+    const delta=(tMax+tMin)/2-nowTemp; const trend=trendWord(delta);
+    const text=`Just nu är det ${Math.round(nowTemp)} grader och ${nowDesc}. Under dagen väntas som lägst ${Math.round(tMin)} och som högst ${Math.round(tMax)} grader, och temperaturen ser ut att ${trend}.`+(tNoon!=null?` Runt lunchtid cirka ${Math.round(tNoon)} grader.`:"");
     return { text };
   }
 
@@ -377,125 +318,84 @@ function speak(text) {
       const data = await updateUIAndGetData();
       const { text } = summarizeToday(data.nowTemp, data.nowDesc, data.forecastList);
       speak(text);
-    } catch(e) {
-      console.warn("announceOnce fel:", e);
-      status("Väderhämtning/tal fel");
-    }
+    } catch(e) { status("Väder/tal-fel"); }
   }
 
   /* ===== Schema ===== */
-  (function scheduleAnnouncements() {
-    let lastStamp = "";
-    let lastDay = (new Date()).getDate();
-    setInterval(() => {
-      const now = new Date();
-      const day = now.getDate();
-      if (day !== lastDay) { lastStamp = ""; lastDay = day; }
-      const dow = now.getDay(); // 0=sön ... 6=lör
-      const h = now.getHours();
-      const m = now.getMinutes();
-      const stamp = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()} ${h}:${m}`;
-      const isWeekday = dow >= 1 && dow <= 5;
-      const isWeekend = dow === 0 || dow === 6;
-      let shouldSpeak = false;
-      if (isWeekday && ((h === 6 && (m === 30 || m === 40 || m === 50)) || (h === 7 && m === 0))) shouldSpeak = true;
-      if (isWeekend && h === 9 && m === 0) shouldSpeak = true;
-      if (h === 18 && m === 5) shouldSpeak = true; // 18:05 alla dagar
-      if (shouldSpeak && stamp !== lastStamp) { lastStamp = stamp; announceOnce(); }
+  (function scheduleAnnouncements(){
+    let lastStamp=""; let lastDay=(new Date()).getDate();
+    setInterval(()=>{
+      const now=new Date(); const day=now.getDate();
+      if(day!==lastDay){lastStamp=""; lastDay=day;}
+      const dow=now.getDay(), h=now.getHours(), m=now.getMinutes();
+      const stamp=`${now.getFullYear()}-${now.getMonth()}-${now.getDate()} ${h}:${m}`;
+      const isWeekday=dow>=1&&dow<=5, isWeekend=dow===0||dow===6;
+      let shouldSpeak=false;
+      if(isWeekday && ((h===6&&(m===30||m===40||m===50)) || (h===7&&m===0))) shouldSpeak=true;
+      if(isWeekend && h===9 && m===0) shouldSpeak=true;
+      if(h===18 && m===5) shouldSpeak=true; // 18:05 alla dagar
+      if(shouldSpeak && stamp!==lastStamp){ lastStamp=stamp; announceOnce(); }
     }, 15000);
   })();
 
-  /* ===== Röstpanel ===== */
-function populateVoiceSelect() {
-  const sel = document.getElementById("voice-select");
-  const info = document.getElementById("voice-info");
-  if (!sel) return;
-
-  const voices = (speechSynthesis.getVoices() || []).slice();
-  const svVoices = voices.filter(v => (v.lang || "").toLowerCase().startsWith("sv"));
-
-  sel.innerHTML = "";
-
-  if (!svVoices.length) {
-    const opt = document.createElement("option");
-    opt.textContent = "Inga svenska röster – installera i Inställningar → Hjälpmedel → Talat innehåll → Röster → Svenska";
-    sel.appendChild(opt);
-    if (info) info.textContent = "Installera en svensk röst i iOS och starta om Chrome.";
-    return;
+  /* ===== Röstpanel (om Web Speech finns) ===== */
+  function populateVoiceSelect(){
+    const sel=document.getElementById("voice-select"), info=document.getElementById("voice-info");
+    if(!window.speechSynthesis){ sel.innerHTML="<option>Webb-röster ej tillgängliga</option>"; return; }
+    const voices=listVoices();
+    voices.sort((a,b)=>{
+      const asv=(a.lang||"").toLowerCase().startsWith("sv");
+      const bsv=(b.lang||"").toLowerCase().startsWith("sv");
+      if(asv&&!bsv) return -1; if(!asv&&bsv) return 1;
+      return (a.lang||"").localeCompare(b.lang||"") || (a.name||"").localeCompare(b.name||"");
+    });
+    sel.innerHTML=""; voices.forEach(v=>{ const o=document.createElement("option"); o.value=v.name; o.textContent=`${v.name} — ${v.lang}`; sel.appendChild(o); });
+    let def = voices.find(v=>v.name===chosenVoiceName) || voices.find(v=>(v.lang||"").toLowerCase().startsWith("sv")) || voices[0];
+    if(def){ sel.value=def.name; chosenVoiceName=def.name; localStorage.setItem("voiceName", chosenVoiceName); svVoice=def; if(info) info.textContent=`Vald: ${def.name} (${def.lang})`; }
+    document.getElementById("rate").value=String(chosenRate); document.getElementById("pitch").value=String(chosenPitch);
   }
 
-  svVoices.sort((a,b) => (a.name||"").localeCompare(b.name||""));
-  svVoices.forEach(v => {
-    const opt = document.createElement("option");
-    opt.value = v.name;
-    opt.textContent = `${v.name} — ${v.lang}`;
-    sel.appendChild(opt);
-  });
-
-  // Välj tidigare sparad, annars första svenska
-  let def = svVoices.find(v => v.name === chosenVoiceName) || svVoices[0];
-  sel.value = def.name;
-  chosenVoiceName = def.name;
-  localStorage.setItem("voiceName", chosenVoiceName);
-  svVoice = def;
-  if (info) info.textContent = `Vald: ${def.name} (${def.lang})`;
-}
-
   /* ===== Init ===== */
-  updateClock();
-  setInterval(updateClock, 1000);
-  updateUIAndGetData();
-  setInterval(updateUIAndGetData, 10 * 60 * 1000);
+  updateClock(); setInterval(updateClock, 1000);
+  updateUIAndGetData(); setInterval(updateUIAndGetData, 10*60*1000);
 
-  document.addEventListener('DOMContentLoaded', () => {
-    // Helskärms-aktivering: MÅSTE ske synkront
-    const unlockBtn = document.getElementById('btn-unlock');
-    const unlockHandler = (e) => {
-      e.preventDefault(); // undvik “ghost click”
-      unlockAudioAndSpeech();
-    };
-    unlockBtn.addEventListener('touchstart', unlockHandler, { passive: false });
+  document.addEventListener('DOMContentLoaded', ()=>{
+    // Overlay-knappen måste tryckas först
+    const unlockBtn=document.getElementById('btn-unlock');
+    const unlockHandler=(e)=>{ e.preventDefault(); primeSpeechSync(); document.getElementById('tap-unlock').style.display='none'; status("Ljud aktiverat"); };
+    unlockBtn.addEventListener('touchstart', unlockHandler, {passive:false});
     unlockBtn.addEventListener('click', unlockHandler);
 
-    // Testknapp – kräver att unlock är gjort först
-    const btn = document.getElementById('btn-test');
-    const handler = (e) => {
-      if (e.type === 'touchstart') e.preventDefault();
-      if (!speechPrimed) { status("Tryck först på 'Aktivera ljud'"); return; }
-      announceOnce();
-    };
-    btn.addEventListener('touchstart', handler, { passive: false });
+    // Testknapp
+    const btn=document.getElementById('btn-test');
+    const handler=(e)=>{ if(e.type==='touchstart') e.preventDefault(); announceOnce(); };
+    btn.addEventListener('touchstart', handler, {passive:false});
     btn.addEventListener('click', handler);
 
     // Röstlista
-    if (speechSynthesis.onvoiceschanged !== undefined) {
-      speechSynthesis.onvoiceschanged = () => { populateVoiceSelect(); };
+    if(window.speechSynthesis){
+      if(speechSynthesis.onvoiceschanged!==undefined){
+        speechSynthesis.onvoiceschanged=()=>{ populateVoiceSelect(); };
+      }
+      populateVoiceSelect();
+    } else {
+      document.getElementById("voice-select").innerHTML="<option>Webb-röster ej tillgängliga</option>";
     }
-    populateVoiceSelect();
 
-    // Röstpanel-händelser
-    const sel = document.getElementById("voice-select");
-    const info = document.getElementById("voice-info");
-    const rate = document.getElementById("rate");
-    const pitch = document.getElementById("pitch");
-    const tryBtn = document.getElementById("try-voice");
-
-    sel.addEventListener("change", ()=>{
-      chosenVoiceName = sel.value;
+    // Panelreglage
+    document.getElementById("voice-select").addEventListener("change", ()=>{
+      chosenVoiceName = document.getElementById("voice-select").value;
       localStorage.setItem("voiceName", chosenVoiceName);
-      const v = listVoices().find(v => v.name === chosenVoiceName);
-      if (v) { svVoice = v; if (info) info.textContent = `Vald: ${v.name} (${v.lang})`; }
+      const pick = listVoices().find(v=>v.name===chosenVoiceName);
+      if (pick){ svVoice=pick; document.getElementById("voice-info").textContent = `Vald: ${pick.name} (${pick.lang})`; }
     });
-    rate.addEventListener("input", ()=>{
-      chosenRate = parseFloat(rate.value);
-      localStorage.setItem("voiceRate", String(chosenRate));
+    document.getElementById("rate").addEventListener("input", ()=>{
+      chosenRate=parseFloat(document.getElementById("rate").value); localStorage.setItem("voiceRate", String(chosenRate));
     });
-    pitch.addEventListener("input", ()=>{
-      chosenPitch = parseFloat(pitch.value);
-      localStorage.setItem("voicePitch", String(chosenPitch));
+    document.getElementById("pitch").addEventListener("input", ()=>{
+      chosenPitch=parseFloat(document.getElementById("pitch").value); localStorage.setItem("voicePitch", String(chosenPitch));
     });
-    tryBtn.addEventListener("click", ()=>{
-      if (!speechPrimed) { status("Tryck först på 'Aktivera ljud'"); return; }
+    document.getElementById("try-voice").addEventListener("click", ()=>{
       speak("Hej! Detta är ett rösttest på svenska.");
     });
   });
