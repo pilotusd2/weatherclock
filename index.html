@@ -316,22 +316,25 @@
     }
   }
 
-  function speak(text) {
-    if (document.visibilityState !== "visible") return;
-    if (!speechPrimed) { status("Tryck för att aktivera ljud först"); return; }
-    try {
-      if (speechSynthesis.paused) speechSynthesis.resume();
-      const u = new SpeechSynthesisUtterance(text);
-      const v = getChosenVoice() || svVoice;
-      if (v) u.voice = v;
-      u.lang = (v && (v.lang||"").toLowerCase().startsWith("sv")) ? v.lang : "sv-SE";
-      u.volume = 1.0; u.rate = chosenRate || 1.0; u.pitch = chosenPitch || 1.0;
-      speechSynthesis.cancel();
-      speechSynthesis.speak(u);
-    } catch(e) {
-      console.warn("Kunde inte tala:", e);
-      status("Tal fel");
+function speak(text) {
+  if (document.visibilityState !== "visible" || !speechPrimed) return;
+  try {
+    const v = getChosenVoice() || svVoice;
+    const u = new SpeechSynthesisUtterance(text);
+    if (v && (v.lang || "").toLowerCase().startsWith("sv")) {
+      u.voice = v;
+      u.lang = v.lang;
+    } else {
+      // stoppa och visa instruktion om ingen svensk röst finns
+      status("Ingen svensk röst – installera i iOS Inställningar.");
+      return;
     }
+    u.volume = 1.0; u.rate = chosenRate || 1.0; u.pitch = chosenPitch || 1.0;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  } catch(e) {
+    console.warn("Kunde inte tala:", e);
+  }
   }
 
   /* ===== Sammanfattning ===== */
@@ -403,42 +406,40 @@
   })();
 
   /* ===== Röstpanel ===== */
-  function populateVoiceSelect() {
-    const sel = document.getElementById("voice-select");
-    const info = document.getElementById("voice-info");
-    if (!sel) return;
-    const voices = listVoices();
+function populateVoiceSelect() {
+  const sel = document.getElementById("voice-select");
+  const info = document.getElementById("voice-info");
+  if (!sel) return;
 
-    voices.sort((a,b)=>{
-      const asv = (a.lang||"").toLowerCase().startsWith("sv");
-      const bsv = (b.lang||"").toLowerCase().startsWith("sv");
-      if (asv && !bsv) return -1;
-      if (!asv && bsv) return 1;
-      return (a.lang||"").localeCompare(b.lang||"") || (a.name||"").localeCompare(b.name||"");
-    });
+  const voices = (speechSynthesis.getVoices() || []).slice();
+  const svVoices = voices.filter(v => (v.lang || "").toLowerCase().startsWith("sv"));
 
-    sel.innerHTML = "";
-    voices.forEach(v=>{
-      const opt = document.createElement("option");
-      opt.value = v.name;
-      opt.textContent = `${v.name} — ${v.lang}`;
-      sel.appendChild(opt);
-    });
+  sel.innerHTML = "";
 
-    let def = voices.find(v => v.name === chosenVoiceName);
-    if (!def) def = voices.find(v => (v.lang||"").toLowerCase().startsWith("sv"));
-    if (!def) def = voices[0];
-    if (def) {
-      sel.value = def.name;
-      chosenVoiceName = def.name;
-      localStorage.setItem("voiceName", chosenVoiceName);
-      const pick = voices.find(v => v.name === chosenVoiceName);
-      if (pick) svVoice = pick;
-      if (info) info.textContent = `Vald: ${def.name} (${def.lang})`;
-    }
-    document.getElementById("rate").value = String(chosenRate);
-    document.getElementById("pitch").value = String(chosenPitch);
+  if (!svVoices.length) {
+    const opt = document.createElement("option");
+    opt.textContent = "Inga svenska röster – installera i Inställningar → Hjälpmedel → Talat innehåll → Röster → Svenska";
+    sel.appendChild(opt);
+    if (info) info.textContent = "Installera en svensk röst i iOS och starta om Chrome.";
+    return;
   }
+
+  svVoices.sort((a,b) => (a.name||"").localeCompare(b.name||""));
+  svVoices.forEach(v => {
+    const opt = document.createElement("option");
+    opt.value = v.name;
+    opt.textContent = `${v.name} — ${v.lang}`;
+    sel.appendChild(opt);
+  });
+
+  // Välj tidigare sparad, annars första svenska
+  let def = svVoices.find(v => v.name === chosenVoiceName) || svVoices[0];
+  sel.value = def.name;
+  chosenVoiceName = def.name;
+  localStorage.setItem("voiceName", chosenVoiceName);
+  svVoice = def;
+  if (info) info.textContent = `Vald: ${def.name} (${def.lang})`;
+}
 
   /* ===== Init ===== */
   updateClock();
