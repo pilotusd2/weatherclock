@@ -1,22 +1,25 @@
 <!DOCTYPE html>
 <html lang="sv">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Väderklocka</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     * { box-sizing: border-box; }
+    html, body { height: 100%; }
     body {
       margin: 0;
       font-family: Arial, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
-      height: 100vh;
+      min-height: 100vh;
       background: #ffffff;
       color: #000000;
       transition: background-color 1s ease, color 1s ease;
       position: relative;
+      -webkit-tap-highlight-color: rgba(0,0,0,0);
+      touch-action: manipulation; /* snabbare klick på iOS */
     }
     #clock { font-size: 25vw; text-align: center; margin: 20px 0 10px 0; line-height: .9; }
     .columns { display: flex; width: 100%; height: 100%; }
@@ -28,7 +31,7 @@
     .weather-icon {
       width: 100%; height: auto; filter: drop-shadow(0 0 4px black);
       position: absolute; top: 0; left: 0; z-index: 0;
-      pointer-events: none; /* viktigt: blockera inte klick/touch */
+      pointer-events: none; /* viktigt: blockera inte knappen */
     }
     .temp-now, .temp-forecast {
       font-size: 8vw; position: absolute; top: 50%; width: 100%;
@@ -52,28 +55,27 @@
 
     :root { --left-bg: #ffffff; --right-bg: #ffffff; }
     body::before {
-      content: '';
-      position: fixed; inset: 0;
+      content: ''; position: fixed; inset: 0; z-index: -1;
       background: linear-gradient(to right,
         var(--left-bg, #ffffff) 0 50%,
         var(--right-bg, #ffffff) 50% 100%);
-      z-index: -1;
     }
 
-    /* Test-knapp: safe-area + z-index + klickbar på iPad */
+    /* Test-knapp: safe-area + hög z-index + touchvänlig */
     .test-speak {
       position: fixed;
       right: calc(12px + env(safe-area-inset-right));
       bottom: calc(12px + env(safe-area-inset-bottom));
-      padding: 10px 14px;
-      min-width: 160px; min-height: 44px;
-      border: 0; border-radius: 10px;
+      padding: 12px 16px;
+      min-width: 180px; min-height: 48px;
+      border: 0; border-radius: 12px;
       background: #111; color: #fff; cursor: pointer;
       box-shadow: 0 4px 10px rgba(0,0,0,.2);
-      opacity: .9; z-index: 10000;
+      opacity: .95; z-index: 10000;
       pointer-events: auto;
+      font-size: 16px;
     }
-    .test-speak:hover { opacity: 1; }
+    .test-speak:active { transform: scale(0.98); }
   </style>
 </head>
 <body>
@@ -102,18 +104,17 @@
 
 <div class="columns">
   <div class="left">
-    <img id="now-icon" src="" class="weather-icon" alt="väder nu">
+    <img id="now-icon" src="" class="weather-icon" alt="väder nu" />
     <div id="temp-now" class="temp-now">-- °C</div>
   </div>
   <div class="right">
-    <img id="forecast-icon" src="" class="weather-icon" alt="prognos">
+    <img id="forecast-icon" src="" class="weather-icon" alt="prognos" />
     <div id="forecast-time" class="forecast-time">--:--</div>
     <div id="temp-forecast" class="temp-forecast">-- °C</div>
   </div>
 </div>
 
-<button class="test-speak" id="btn-test" type="button"
-        onclick="activateSpeechAndTest()">🔊 Testa tal nu</button>
+<button class="test-speak" id="btn-test" type="button" aria-label="Testa tal nu">🔊 Testa tal nu</button>
 
 <script>
   // ----- Klocka -----
@@ -124,15 +125,6 @@
   }
 
   // ----- Färg & bakgrund -----
-  function hexToRgb(hex) {
-    const bigint = parseInt(hex.slice(1), 16);
-    return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
-  }
-  function getTextColorForBackground(hex) {
-    const { r, g, b } = hexToRgb(hex);
-    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-    return luminance > 186 ? 'black' : 'white';
-  }
   function getBackgroundColor(temp) {
     if (temp <= -20) return '#001d4a';
     else if (temp <= -15) return '#003b8b';
@@ -157,42 +149,32 @@
     const urlNow = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=sv`;
     const urlForecast = `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${apiKey}&units=metric&lang=sv`;
 
-    try {
-      const [resNow, resForecast] = await Promise.all([fetch(urlNow), fetch(urlForecast)]);
-      const dataNow = await resNow.json();
-      const dataForecast = await resForecast.json();
+    const [resNow, resForecast] = await Promise.all([fetch(urlNow), fetch(urlForecast)]);
+    const dataNow = await resNow.json();
+    const dataForecast = await resForecast.json();
 
-      // NU
-      const tempNow = Math.round(dataNow.main.temp);
-      const iconNow = dataNow.weather[0].icon;
-      document.getElementById('temp-now').textContent = `${tempNow} °C`;
-      document.getElementById('now-icon').src = `https://openweathermap.org/img/wn/${iconNow}@4x.png`;
-      document.getElementById('temp-now').style.color = tempNow <= 0 ? '#3399ff' : '#e60000';
-      document.documentElement.style.setProperty('--left-bg', getBackgroundColor(tempNow));
+    const tempNow = Math.round(dataNow.main.temp);
+    const iconNow = dataNow.weather[0].icon;
+    document.getElementById('temp-now').textContent = `${tempNow} °C`;
+    document.getElementById('now-icon').src = `https://openweathermap.org/img/wn/${iconNow}@4x.png`;
+    document.getElementById('temp-now').style.color = tempNow <= 0 ? '#3399ff' : '#e60000';
+    document.documentElement.style.setProperty('--left-bg', getBackgroundColor(tempNow));
 
-      // PROGNOS (närmsta steg framåt)
-      const forecast = dataForecast.list[1];
-      const tempForecast = Math.round(forecast.main.temp);
-      const iconForecast = forecast.weather[0].icon;
-      const time = new Date(forecast.dt * 1000).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const forecast = dataForecast.list[1];
+    const tempForecast = Math.round(forecast.main.temp);
+    const iconForecast = forecast.weather[0].icon;
+    const time = new Date(forecast.dt * 1000).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', hour12: false });
+    document.getElementById('temp-forecast').textContent = `${tempForecast}°C`;
+    document.getElementById('forecast-icon').src = `https://openweathermap.org/img/wn/${iconForecast}@4x.png`;
+    document.getElementById('forecast-time').textContent = time;
+    document.getElementById('temp-forecast').style.color = tempForecast <= 0 ? '#3399ff' : '#e60000';
+    document.documentElement.style.setProperty('--right-bg', getBackgroundColor(tempForecast));
 
-      document.getElementById('temp-forecast').textContent = `${tempForecast}°C`;
-      document.getElementById('forecast-icon').src = `https://openweathermap.org/img/wn/${iconForecast}@4x.png`;
-      document.getElementById('forecast-time').textContent = time;
-      document.getElementById('temp-forecast').style.color = tempForecast <= 0 ? '#3399ff' : '#e60000';
-      document.documentElement.style.setProperty('--right-bg', getBackgroundColor(tempForecast));
+    setTempIndicator('temp-indicator-now', tempNow);
+    setTempIndicator('temp-indicator-forecast', tempForecast);
 
-      // Indikatorer
-      setTempIndicator('temp-indicator-now', tempNow);
-      setTempIndicator('temp-indicator-forecast', tempForecast);
-
-      // Data för tal
-      const nowDesc = (dataNow.weather?.[0]?.description || "").toLowerCase();
-      return { nowTemp: dataNow.main.temp, nowDesc, forecastList: dataForecast.list };
-    } catch (err) {
-      console.error('Fel vid hämtning:', err);
-      throw err;
-    }
+    const nowDesc = (dataNow.weather?.[0]?.description || "").toLowerCase();
+    return { nowTemp: dataNow.main.temp, nowDesc, forecastList: dataForecast.list };
   }
 
   // ----- Skala-indikatorer -----
@@ -207,67 +189,63 @@
     indicator.style.left = `calc(10% + ${pixelPos - 5}px)`;
   }
 
-  // ===== TAL (svensk, kvinnlig om möjligt) =====
-  let speechReady = false;
+  // ===== TAL (svenska, kvinnlig om möjligt) =====
+  let speechPrimed = false;
   let svVoice = null;
 
   function pickSwedishFemaleVoice() {
     const voices = speechSynthesis.getVoices() || [];
     const norm = s => (s || "").toLowerCase();
-
-    // 1) Chrome: Google svenska (ofta kvinnlig)
+    // 1) Google svenska (Chrome)
     let v = voices.find(v => norm(v.name).includes("google") && norm(v.lang).startsWith("sv"));
     if (v) return v;
-
-    // 2) Svenska röster, försök med typiska kvinnonamn (macOS/iOS)
+    // 2) Svenska röster med typiska kvinnonamn (iOS/macOS)
     const sv = voices.filter(v => norm(v.lang).startsWith("sv"));
     const femaleNames = ["alva","tove","siri","elin","maria","anna","klara","agnes"];
     v = sv.find(v => femaleNames.some(n => norm(v.name).includes(n)));
     if (v) return v;
-
-    // 3) Annars första svenska
+    // 3) Första svenska
     if (sv.length) return sv[0];
-
-    // 4) Sista utväg
+    // 4) fallback
     return voices[0] || null;
   }
 
-  function initSpeechAfterGesture() {
+  // PRIMING: måste köras SYNKRONT i samma händelse som trycket (touchstart/click)
+  function primeSpeechSync() {
     try {
-      speechSynthesis.cancel(); // rensa kö
-      const tryLoad = () => {
-        svVoice = pickSwedishFemaleVoice();
-        speechReady = true;
-        // Öppna ljudkanalen (Safari/WebKit)
-        const u = new SpeechSynthesisUtterance("Tal aktiverat.");
-        if (svVoice) u.voice = svVoice;
-        u.lang = svVoice?.lang || "sv-SE";
-        u.volume = 1.0; u.rate = 1.0; u.pitch = 1.0;
-        speechSynthesis.speak(u);
-      };
+      // Välj röst om möjligt (kan vara tom första gången på iOS; då funkar lang ändå)
+      svVoice = pickSwedishFemaleVoice();
+      const u = new SpeechSynthesisUtterance("Tal aktiverat.");
+      if (svVoice) u.voice = svVoice;
+      u.lang = (svVoice && svVoice.lang) ? svVoice.lang : "sv-SE";
+      u.volume = 1.0; u.rate = 1.0; u.pitch = 1.0;
+      speechSynthesis.cancel();
+      speechSynthesis.speak(u);
+      speechPrimed = true;
 
+      // Ladda om röster asynkront efteråt för att låsa in bästa röst framöver
       if (speechSynthesis.onvoiceschanged !== undefined) {
-        const once = () => { speechSynthesis.onvoiceschanged = null; tryLoad(); };
+        const once = () => { speechSynthesis.onvoiceschanged = null; svVoice = pickSwedishFemaleVoice(); };
         speechSynthesis.onvoiceschanged = once;
-        setTimeout(() => { if (!speechReady) tryLoad(); }, 800);
       } else {
-        setTimeout(tryLoad, 0);
+        // försökt uppdatera röst efter en stund
+        setTimeout(() => { svVoice = pickSwedishFemaleVoice(); }, 800);
       }
     } catch(e) {
-      console.warn("Init tal misslyckades:", e);
+      console.warn("primeSpeechSync fel:", e);
     }
   }
 
   function speak(text) {
     if (document.visibilityState !== "visible") return;
-    if (!speechReady) return;
+    if (!speechPrimed) return;
     try {
       if (speechSynthesis.paused) speechSynthesis.resume();
       const u = new SpeechSynthesisUtterance(text);
       if (svVoice) u.voice = svVoice;
-      u.lang = svVoice?.lang || "sv-SE";
+      u.lang = (svVoice && svVoice.lang) ? svVoice.lang : "sv-SE";
       u.volume = 1.0; u.rate = 1.0; u.pitch = 1.0;
-      speechSynthesis.cancel(); // undvik kö-häng
+      speechSynthesis.cancel();
       speechSynthesis.speak(u);
     } catch(e) {
       console.warn("Kunde inte tala:", e);
@@ -311,11 +289,11 @@
 
   async function announceOnce() {
     try {
-      const data = await updateUIAndGetData(); // uppdaterar UI + hämtar färsk data
+      const data = await updateUIAndGetData(); // hämtar färsk data + uppdaterar UI
       const { text } = summarizeToday(data.nowTemp, data.nowDesc, data.forecastList);
       speak(text);
-    } catch (e) {
-      console.warn("Kunde inte göra röstannons:", e);
+    } catch(e) {
+      console.warn("announceOnce fel:", e);
     }
   }
 
@@ -341,58 +319,44 @@
 
       // Vardagar: 06:30, 06:40, 06:50, 07:00
       if (isWeekday) {
-        if ((h === 6 && (m === 30 || m === 40 || m === 50)) || (h === 7 && m === 0)) {
-          shouldSpeak = true;
-        }
+        if ((h === 6 && (m === 30 || m === 40 || m === 50)) || (h === 7 && m === 0)) shouldSpeak = true;
       }
       // Helger: 09:00 (en gång)
-      if (isWeekend && h === 9 && m === 0) {
-        shouldSpeak = true;
-      }
+      if (isWeekend && h === 9 && m === 0) shouldSpeak = true;
       // Alla dagar: 18:05 (en gång)
-      if (h === 18 && m === 5) {
-        shouldSpeak = true;
-      }
+      if (h === 18 && m === 5) shouldSpeak = true;
 
       if (shouldSpeak && stamp !== lastStamp) {
         lastStamp = stamp;
         announceOnce();
       }
-    }, 15000); // kontroll var 15:e sekund
+    }, 15000);
   })();
 
   // ----- Init -----
   updateClock();
   setInterval(updateClock, 1000);
 
-  // Första laddningen + var 10:e minut
   updateUIAndGetData();
   setInterval(updateUIAndGetData, 10 * 60 * 1000);
 
-  // Aktivera tal vid första gest + extra touch-lyssnare på iPad
-  function activateSpeechAndTest() {
-    try {
-      if (!window.speechReady) {
-        initSpeechAfterGesture();
-        setTimeout(() => { speak("Tal aktiverat."); }, 120);
-      } else {
-        speak("Test av röst. Tal aktiverat.");
-      }
-      announceOnce();
-    } catch(e) {
-      console.warn("activateSpeechAndTest fel:", e);
-    }
-  }
+  // ----- Knapp: fånga touchstart och click -----
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('btn-test');
+    if (!btn) return;
 
-  document.addEventListener("DOMContentLoaded", () => {
-    const btn = document.getElementById("btn-test");
-    const handler = () => activateSpeechAndTest();
-    if (btn) {
-      btn.addEventListener("click", handler);
-      btn.addEventListener("touchend", handler, { passive: true });
-    }
-    const armOnce = () => { if (!window.speechReady) initSpeechAfterGesture(); document.removeEventListener("pointerdown", armOnce); };
-    document.addEventListener("pointerdown", armOnce, { once: true });
+    // Viktigt: PRIMING måste ske direkt inom samma event-loop som användarens gest.
+    const handler = (e) => {
+      // På iOS behöver vi ibland hindra "ghost click"/fördröjning
+      if (e.type === 'touchstart') e.preventDefault();
+      if (!speechPrimed) primeSpeechSync();   // tal direkt
+      // kör väderuppläsning efter priming (kan vara i samma event-loop)
+      announceOnce();
+    };
+
+    // Fånga touch först, sen fallback till click
+    btn.addEventListener('touchstart', handler, { passive: false });
+    btn.addEventListener('click', handler);
   });
 </script>
 
