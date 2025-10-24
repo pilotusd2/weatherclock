@@ -61,12 +61,20 @@
       z-index: -1;
     }
 
-    /* Test-knapp (diskret) */
+    /* Test-knapp fixad för Safari/iOS */
     .test-speak {
-      position: fixed; right: 12px; bottom: 12px;
-      padding: 10px 14px; border: 0; border-radius: 10px;
-      background: #111; color: #fff; cursor: pointer;
-      box-shadow: 0 4px 10px rgba(0,0,0,.2); opacity: .8;
+      position: fixed;
+      right: calc(12px + env(safe-area-inset-right));
+      bottom: calc(12px + env(safe-area-inset-bottom));
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 10px;
+      background: #111;
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0,0,0,.2);
+      opacity: .9;
+      z-index: 10000;
     }
     .test-speak:hover { opacity: 1; }
   </style>
@@ -107,7 +115,7 @@
   </div>
 </div>
 
-<button class="test-speak" id="btn-test">Testa tal nu</button>
+<button class="test-speak" id="btn-test" type="button">🔊 Testa tal nu</button>
 
 <script>
   // ----- Klocka -----
@@ -156,57 +164,32 @@
       const dataNow = await resNow.json();
       const dataForecast = await resForecast.json();
 
-      // NU
       const tempNow = Math.round(dataNow.main.temp);
       const iconNow = dataNow.weather[0].icon;
       document.getElementById('temp-now').textContent = `${tempNow} °C`;
       document.getElementById('now-icon').src = `https://openweathermap.org/img/wn/${iconNow}@4x.png`;
 
-      // Färg på siffror (vänster)
-      const tempNowEl = document.getElementById('temp-now');
-      tempNowEl.style.color = tempNow <= 0 ? '#3399ff' : '#e60000';
-
-      // Bakgrund (vänster)
+      document.getElementById('temp-now').style.color = tempNow <= 0 ? '#3399ff' : '#e60000';
       const left = document.querySelector('.left');
       const bgNow = getBackgroundColor(tempNow);
-      const fgNow = getTextColorForBackground(bgNow);
       document.documentElement.style.setProperty('--left-bg', bgNow);
-      left.style.backgroundColor = 'transparent';
-      left.style.color = fgNow;
 
-      // PROGNOS (närmsta steg framåt)
       const forecast = dataForecast.list[1];
       const tempForecast = Math.round(forecast.main.temp);
       const iconForecast = forecast.weather[0].icon;
       const time = new Date(forecast.dt * 1000).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', hour12: false });
-
       document.getElementById('temp-forecast').textContent = `${tempForecast}°C`;
       document.getElementById('forecast-icon').src = `https://openweathermap.org/img/wn/${iconForecast}@4x.png`;
       document.getElementById('forecast-time').textContent = time;
+      document.getElementById('temp-forecast').style.color = tempForecast <= 0 ? '#3399ff' : '#e60000';
 
-      // Färg på siffror (höger)
-      const tempForecastEl = document.getElementById('temp-forecast');
-      tempForecastEl.style.color = tempForecast <= 0 ? '#3399ff' : '#e60000';
+      document.documentElement.style.setProperty('--right-bg', getBackgroundColor(tempForecast));
 
-      // Bakgrund (höger)
-      const right = document.querySelector('.right');
-      const bgFc = getBackgroundColor(tempForecast);
-      const fgFc = getTextColorForBackground(bgFc);
-      document.documentElement.style.setProperty('--right-bg', bgFc);
-      right.style.backgroundColor = 'transparent';
-      right.style.color = fgFc;
-
-      // Flytta indikatorprickarna på skalan
       setTempIndicator('temp-indicator-now', tempNow);
       setTempIndicator('temp-indicator-forecast', tempForecast);
 
-      // Returnera data för talsammanfattning
       const nowDesc = (dataNow.weather?.[0]?.description || "").toLowerCase();
-      return {
-        nowTemp: dataNow.main.temp,
-        nowDesc,
-        forecastList: dataForecast.list
-      };
+      return { nowTemp: dataNow.main.temp, nowDesc, forecastList: dataForecast.list };
     } catch (err) {
       console.error('Fel vid hämtning:', err);
       throw err;
@@ -215,7 +198,7 @@
 
   // ----- Skala-indikatorer -----
   function setTempIndicator(id, tempC) {
-    const minTemp = -20; const maxTemp = 40;
+    const minTemp = -20, maxTemp = 40;
     const scaleContainer = document.querySelector('.color-scale-container');
     const indicator = document.getElementById(id);
     if (!scaleContainer || !indicator) return;
@@ -225,18 +208,14 @@
     indicator.style.left = `calc(10% + ${pixelPos - 5}px)`;
   }
 
-  // ----- Tal (Web Speech API) -----
+  // ----- Tal -----
   function speak(text) {
-    try {
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = "sv-SE";
-      u.rate = 1.0;
-      u.pitch = 1.0;
-      speechSynthesis.cancel(); // avbryt ev. pågående
-      speechSynthesis.speak(u);
-    } catch(e) {
-      console.warn("Kunde inte tala:", e);
-    }
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "sv-SE";
+    u.rate = 1.0;
+    u.pitch = 1.0;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
   }
   function trendWord(delta) {
     const a = Math.abs(delta);
@@ -249,39 +228,27 @@
     }
     const now = new Date();
     const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
-
     const today = forecastList.filter(item => {
       const t = new Date(item.dt * 1000);
       return t.getFullYear() === y && t.getMonth() === m && t.getDate() === d;
     });
     const daySet = today.length ? today : forecastList.slice(0, Math.min(8, forecastList.length));
-
     const temps = daySet.map(i => i.main.temp);
-    const tMin = Math.min(...temps);
-    const tMax = Math.max(...temps);
-
+    const tMin = Math.min(...temps), tMax = Math.max(...temps);
     let tNoon = null, bestDiff = Infinity;
     for (const i of daySet) {
       const t = new Date(i.dt * 1000);
       const diff = Math.abs(t.getHours() + t.getMinutes()/60 - 12);
       if (diff < bestDiff) { bestDiff = diff; tNoon = i.main.temp; }
     }
-
-    const delta = (tMax + tMin)/2 - nowTemp; // grov riktning
+    const delta = (tMax + tMin)/2 - nowTemp;
     const trend = trendWord(delta);
-
-    const text =
-      `Just nu är det ${Math.round(nowTemp)} grader och ${nowDesc}. ` +
-      `Under dagen väntas som lägst ${Math.round(tMin)} och som högst ${Math.round(tMax)} grader, ` +
-      `och temperaturen ser ut att ${trend}.` +
-      (tNoon != null ? ` Runt lunchtid cirka ${Math.round(tNoon)} grader.` : "");
-
+    const text = `Just nu är det ${Math.round(nowTemp)} grader och ${nowDesc}. Under dagen väntas som lägst ${Math.round(tMin)} och som högst ${Math.round(tMax)} grader, och temperaturen ser ut att ${trend}.` + (tNoon != null ? ` Runt lunchtid cirka ${Math.round(tNoon)} grader.` : "");
     return { text };
   }
-
   async function announceOnce() {
     try {
-      const data = await updateUIAndGetData(); // uppdaterar UI och hämtar färsk data
+      const data = await updateUIAndGetData();
       const { text } = summarizeToday(data.nowTemp, data.nowDesc, data.forecastList);
       speak(text);
     } catch (e) {
@@ -289,61 +256,40 @@
     }
   }
 
-  // ----- Schema för automatiskt tal -----
+  // ----- Schema -----
   (function scheduleAnnouncements() {
     let lastStamp = "";
     let lastDay = (new Date()).getDate();
-
     setInterval(() => {
       const now = new Date();
       const day = now.getDate();
       if (day !== lastDay) { lastStamp = ""; lastDay = day; }
-
-      const dow = now.getDay(); // 0=sön ... 6=lör
+      const dow = now.getDay();
       const h = now.getHours();
       const m = now.getMinutes();
       const stamp = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()} ${h}:${m}`;
-
       const isWeekday = dow >= 1 && dow <= 5;
       const isWeekend = dow === 0 || dow === 6;
-
       let shouldSpeak = false;
-
-      // Vardagar: 06:30, 06:40, 06:50, 07:00
       if (isWeekday) {
-        if ((h === 6 && (m === 30 || m === 40 || m === 50)) || (h === 7 && m === 0)) {
-          shouldSpeak = true;
-        }
+        if ((h === 6 && (m === 30 || m === 40 || m === 50)) || (h === 7 && m === 0)) shouldSpeak = true;
       }
-      // Helger: 09:00 (en gång)
-      if (isWeekend) {
-        if (h === 9 && m === 0) {
-          shouldSpeak = true;
-        }
-      }
-      // Alla dagar: 18:00 (en gång)
-      if (h === 18 && m === 0) {
-        shouldSpeak = true;
-      }
-
-      if (shouldSpeak && stamp !== lastStamp) {
-        lastStamp = stamp;
-        announceOnce();
-      }
-    }, 15000); // kontroll var 15:e sekund
+      if (isWeekend && h === 9 && m === 0) shouldSpeak = true;
+      if (h === 18 && m === 5) shouldSpeak = true; // <=== kl 18:05 alla dagar
+      if (shouldSpeak && stamp !== lastStamp) { lastStamp = stamp; announceOnce(); }
+    }, 15000);
   })();
 
-  // ----- Init + intervaller -----
+  // ----- Init -----
   updateClock();
   setInterval(updateClock, 1000);
-
-  // Första laddningen + uppdatera var 10:e minut
   updateUIAndGetData();
   setInterval(updateUIAndGetData, 10 * 60 * 1000);
 
-  // Test-knapp: prata direkt
-  document.getElementById('btn-test').addEventListener('click', () => {
-    announceOnce();
+  // Testknapp: kör direkt
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('btn-test');
+    if (btn) btn.addEventListener('click', () => announceOnce());
   });
 </script>
 
