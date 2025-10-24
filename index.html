@@ -25,8 +25,10 @@
       align-items: center; justify-content: flex-start; padding-top: 30px;
       transition: background-color 0.6s ease, color 0.6s ease;
     }
-    .weather-icon { width: 100%; height: auto; filter: drop-shadow(0 0 4px black);
+    .weather-icon {
+      width: 100%; height: auto; filter: drop-shadow(0 0 4px black);
       position: absolute; top: 0; left: 0; z-index: 0;
+      pointer-events: none; /* viktigt: blockera inte klick/touch */
     }
     .temp-now, .temp-forecast {
       font-size: 8vw; position: absolute; top: 50%; width: 100%;
@@ -38,9 +40,7 @@
     .color-scale-container { position: absolute; top: 10px; left: 10%;
       width: 80%; height: 30px; display: flex; justify-content: space-between; z-index: 10;
     }
-    .color-segment-wrapper { display: flex; flex-direction: column;
-      align-items: center; flex: 1;
-    }
+    .color-segment-wrapper { display: flex; flex-direction: column; align-items: center; flex: 1; }
     .color-segment { width: 100%; height: 6px; }
     .temp-label { font-size: 10px; color: black; margin-top: 2px; }
     .temp-indicator-now, .temp-indicator-forecast {
@@ -53,28 +53,25 @@
     :root { --left-bg: #ffffff; --right-bg: #ffffff; }
     body::before {
       content: '';
-      position: fixed;
-      inset: 0;
+      position: fixed; inset: 0;
       background: linear-gradient(to right,
         var(--left-bg, #ffffff) 0 50%,
         var(--right-bg, #ffffff) 50% 100%);
       z-index: -1;
     }
 
-    /* Test-knapp fixad för Safari/iOS (safe area + z-index) */
+    /* Test-knapp: safe-area + z-index + klickbar på iPad */
     .test-speak {
       position: fixed;
       right: calc(12px + env(safe-area-inset-right));
       bottom: calc(12px + env(safe-area-inset-bottom));
       padding: 10px 14px;
-      border: 0;
-      border-radius: 10px;
-      background: #111;
-      color: #fff;
-      cursor: pointer;
+      min-width: 160px; min-height: 44px;
+      border: 0; border-radius: 10px;
+      background: #111; color: #fff; cursor: pointer;
       box-shadow: 0 4px 10px rgba(0,0,0,.2);
-      opacity: .9;
-      z-index: 10000;
+      opacity: .9; z-index: 10000;
+      pointer-events: auto;
     }
     .test-speak:hover { opacity: 1; }
   </style>
@@ -115,7 +112,8 @@
   </div>
 </div>
 
-<button class="test-speak" id="btn-test" type="button">🔊 Testa tal nu</button>
+<button class="test-speak" id="btn-test" type="button"
+        onclick="activateSpeechAndTest()">🔊 Testa tal nu</button>
 
 <script>
   // ----- Klocka -----
@@ -125,7 +123,7 @@
     document.getElementById('clock').textContent = time;
   }
 
-  // ----- Färgverktyg -----
+  // ----- Färg & bakgrund -----
   function hexToRgb(hex) {
     const bigint = parseInt(hex.slice(1), 16);
     return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
@@ -152,7 +150,7 @@
     else return '#f44336';
   }
 
-  // ----- Väderhämtning + UI-uppdatering -----
+  // ----- Väderhämtning + UI -----
   async function updateUIAndGetData() {
     const apiKey = '520bfebd2e95a6b1a08befe3286c9ca1';
     const city = 'Bromma,SE';
@@ -170,8 +168,6 @@
       document.getElementById('temp-now').textContent = `${tempNow} °C`;
       document.getElementById('now-icon').src = `https://openweathermap.org/img/wn/${iconNow}@4x.png`;
       document.getElementById('temp-now').style.color = tempNow <= 0 ? '#3399ff' : '#e60000';
-
-      // Bakgrund (vänster)
       document.documentElement.style.setProperty('--left-bg', getBackgroundColor(tempNow));
 
       // PROGNOS (närmsta steg framåt)
@@ -184,15 +180,13 @@
       document.getElementById('forecast-icon').src = `https://openweathermap.org/img/wn/${iconForecast}@4x.png`;
       document.getElementById('forecast-time').textContent = time;
       document.getElementById('temp-forecast').style.color = tempForecast <= 0 ? '#3399ff' : '#e60000';
-
-      // Bakgrund (höger)
       document.documentElement.style.setProperty('--right-bg', getBackgroundColor(tempForecast));
 
-      // Flytta indikatorprickarna på skalan
+      // Indikatorer
       setTempIndicator('temp-indicator-now', tempNow);
       setTempIndicator('temp-indicator-forecast', tempForecast);
 
-      // Returnera data för talsammanfattning
+      // Data för tal
       const nowDesc = (dataNow.weather?.[0]?.description || "").toLowerCase();
       return { nowTemp: dataNow.main.temp, nowDesc, forecastList: dataForecast.list };
     } catch (err) {
@@ -213,37 +207,38 @@
     indicator.style.left = `calc(10% + ${pixelPos - 5}px)`;
   }
 
-  // ===== TAL (svensk kvinnlig röst om möjligt) =====
+  // ===== TAL (svensk, kvinnlig om möjligt) =====
   let speechReady = false;
   let svVoice = null;
 
   function pickSwedishFemaleVoice() {
     const voices = speechSynthesis.getVoices() || [];
+    const norm = s => (s || "").toLowerCase();
 
-    // 1) Svenska röster
-    const sv = voices.filter(v => (v.lang || "").toLowerCase().startsWith("sv"));
+    // 1) Chrome: Google svenska (ofta kvinnlig)
+    let v = voices.find(v => norm(v.name).includes("google") && norm(v.lang).startsWith("sv"));
+    if (v) return v;
 
-    // 2) Försök hitta "kvinnliga" namn (heuristik – Web Speech API har ingen könsflagga)
-    const femaleNames = ["alva", "tove", "siri", "elin", "maria", "anna", "klara", "agnes"];
-    const svFemale = sv.find(v => femaleNames.some(n => (v.name || "").toLowerCase().includes(n)));
-    if (svFemale) return svFemale;
+    // 2) Svenska röster, försök med typiska kvinnonamn (macOS/iOS)
+    const sv = voices.filter(v => norm(v.lang).startsWith("sv"));
+    const femaleNames = ["alva","tove","siri","elin","maria","anna","klara","agnes"];
+    v = sv.find(v => femaleNames.some(n => norm(v.name).includes(n)));
+    if (v) return v;
 
     // 3) Annars första svenska
     if (sv.length) return sv[0];
 
-    // 4) Sista utväg: systemets första röst
+    // 4) Sista utväg
     return voices[0] || null;
   }
 
   function initSpeechAfterGesture() {
     try {
       speechSynthesis.cancel(); // rensa kö
-
       const tryLoad = () => {
         svVoice = pickSwedishFemaleVoice();
         speechReady = true;
-
-        // Kort testrad för att "öppna" ljud i Safari
+        // Öppna ljudkanalen (Safari/WebKit)
         const u = new SpeechSynthesisUtterance("Tal aktiverat.");
         if (svVoice) u.voice = svVoice;
         u.lang = svVoice?.lang || "sv-SE";
@@ -264,17 +259,14 @@
   }
 
   function speak(text) {
-    // Tala bara om fliken syns och tal initierats (Safari-krav)
     if (document.visibilityState !== "visible") return;
     if (!speechReady) return;
-
     try {
       if (speechSynthesis.paused) speechSynthesis.resume();
       const u = new SpeechSynthesisUtterance(text);
       if (svVoice) u.voice = svVoice;
       u.lang = svVoice?.lang || "sv-SE";
       u.volume = 1.0; u.rate = 1.0; u.pitch = 1.0;
-
       speechSynthesis.cancel(); // undvik kö-häng
       speechSynthesis.speak(u);
     } catch(e) {
@@ -282,7 +274,7 @@
     }
   }
 
-  // ----- Sammanfattning för dagens väder -----
+  // ----- Sammanfattning -----
   function trendWord(delta) {
     const a = Math.abs(delta);
     if (a < 0.6) return "vara ungefär oförändrad";
@@ -309,7 +301,11 @@
     }
     const delta = (tMax + tMin)/2 - nowTemp;
     const trend = trendWord(delta);
-    const text = `Just nu är det ${Math.round(nowTemp)} grader och ${nowDesc}. Under dagen väntas som lägst ${Math.round(tMin)} och som högst ${Math.round(tMax)} grader, och temperaturen ser ut att ${trend}.` + (tNoon != null ? ` Runt lunchtid cirka ${Math.round(tNoon)} grader.` : "");
+    const text =
+      `Just nu är det ${Math.round(nowTemp)} grader och ${nowDesc}. ` +
+      `Under dagen väntas som lägst ${Math.round(tMin)} och som högst ${Math.round(tMax)} grader, ` +
+      `och temperaturen ser ut att ${trend}.` +
+      (tNoon != null ? ` Runt lunchtid cirka ${Math.round(tNoon)} grader.` : "");
     return { text };
   }
 
@@ -323,7 +319,7 @@
     }
   }
 
-  // ----- Schema för automatiskt tal -----
+  // ----- Schema -----
   (function scheduleAnnouncements() {
     let lastStamp = "";
     let lastDay = (new Date()).getDate();
@@ -365,25 +361,37 @@
     }, 15000); // kontroll var 15:e sekund
   })();
 
-  // ----- Init + intervaller -----
+  // ----- Init -----
   updateClock();
   setInterval(updateClock, 1000);
 
-  // Första laddningen + uppdatera var 10:e minut
+  // Första laddningen + var 10:e minut
   updateUIAndGetData();
   setInterval(updateUIAndGetData, 10 * 60 * 1000);
 
-  // Aktivera tal vid första gest + testknapp
+  // Aktivera tal vid första gest + extra touch-lyssnare på iPad
+  function activateSpeechAndTest() {
+    try {
+      if (!window.speechReady) {
+        initSpeechAfterGesture();
+        setTimeout(() => { speak("Tal aktiverat."); }, 120);
+      } else {
+        speak("Test av röst. Tal aktiverat.");
+      }
+      announceOnce();
+    } catch(e) {
+      console.warn("activateSpeechAndTest fel:", e);
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     const btn = document.getElementById("btn-test");
+    const handler = () => activateSpeechAndTest();
     if (btn) {
-      btn.addEventListener("click", () => {
-        if (!speechReady) initSpeechAfterGesture();
-        announceOnce();
-      });
+      btn.addEventListener("click", handler);
+      btn.addEventListener("touchend", handler, { passive: true });
     }
-    // Om användaren bara trycker var som helst första gången
-    const armOnce = () => { if (!speechReady) initSpeechAfterGesture(); document.removeEventListener("pointerdown", armOnce); };
+    const armOnce = () => { if (!window.speechReady) initSpeechAfterGesture(); document.removeEventListener("pointerdown", armOnce); };
     document.addEventListener("pointerdown", armOnce, { once: true });
   });
 </script>
