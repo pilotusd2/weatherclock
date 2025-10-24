@@ -19,7 +19,7 @@
       transition: background-color 1s ease, color 1s ease;
       position: relative;
       -webkit-tap-highlight-color: rgba(0,0,0,0);
-      touch-action: manipulation; /* snabbare klick på iOS */
+      touch-action: manipulation;
     }
     #clock { font-size: 25vw; text-align: center; margin: 20px 0 10px 0; line-height: .9; }
     .columns { display: flex; width: 100%; height: 100%; }
@@ -31,7 +31,7 @@
     .weather-icon {
       width: 100%; height: auto; filter: drop-shadow(0 0 4px black);
       position: absolute; top: 0; left: 0; z-index: 0;
-      pointer-events: none; /* viktigt: blockera inte knappen */
+      pointer-events: none; /* blockera inte knappar */
     }
     .temp-now, .temp-forecast {
       font-size: 8vw; position: absolute; top: 50%; width: 100%;
@@ -76,13 +76,26 @@
       font-size: 16px;
     }
     .test-speak:active { transform: scale(0.98); }
+
+    /* Röstverktyg-panel (vänster nere) */
+    .voice-panel {
+      position: fixed; left: 12px; bottom: 12px; z-index: 10000;
+      background: rgba(0,0,0,0.85); color: #fff;
+      padding: 10px; border-radius: 12px; max-width: 80vw; font-size: 12px;
+    }
+    .voice-panel select, .voice-panel input[type="range"], .voice-panel button {
+      width: 100%;
+    }
+    .voice-panel button {
+      margin-top: 6px; padding: 6px 8px; border-radius: 8px; border: 0; background: #1e88e5; color: #fff;
+    }
   </style>
 </head>
 <body>
 
+<!-- Skala och indikatorer -->
 <div id="temp-indicator-now" class="temp-indicator-now"></div>
 <div id="temp-indicator-forecast" class="temp-indicator-forecast"></div>
-
 <div class="color-scale-container">
   <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#001d4a;"></div><div class="temp-label">-20°</div></div>
   <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#003b8b;"></div><div class="temp-label">-15°</div></div>
@@ -100,8 +113,8 @@
   <div class="color-segment-wrapper"><div class="color-segment" style="background-color:#f44336;"></div><div class="temp-label">40°</div></div>
 </div>
 
+<!-- Klocka och kolumner -->
 <div id="clock">--:--</div>
-
 <div class="columns">
   <div class="left">
     <img id="now-icon" src="" class="weather-icon" alt="väder nu" />
@@ -114,17 +127,28 @@
   </div>
 </div>
 
+<!-- Testknapp -->
 <button class="test-speak" id="btn-test" type="button" aria-label="Testa tal nu">🔊 Testa tal nu</button>
 
+<!-- Röstverktyg -->
+<div class="voice-panel">
+  <div style="margin-bottom:6px">Röst:</div>
+  <select id="voice-select"><option>laddar röster…</option></select>
+  <label>Hastighet <input id="rate" type="range" min="0.6" max="1.4" step="0.05" value="1.0"></label>
+  <label>Tonhöjd <input id="pitch" type="range" min="0.8" max="1.2" step="0.05" value="1.0"></label>
+  <button id="try-voice">🔉 Prova vald röst</button>
+  <div id="voice-info" style="margin-top:6px;opacity:.8">Vald: okänd</div>
+</div>
+
 <script>
-  // ----- Klocka -----
+  /* ===== KLOCKA ===== */
   function updateClock() {
     const now = new Date();
     const time = now.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', hour12: false });
     document.getElementById('clock').textContent = time;
   }
 
-  // ----- Färg & bakgrund -----
+  /* ===== FÄRG/BG ===== */
   function getBackgroundColor(temp) {
     if (temp <= -20) return '#001d4a';
     else if (temp <= -15) return '#003b8b';
@@ -142,7 +166,7 @@
     else return '#f44336';
   }
 
-  // ----- Väderhämtning + UI -----
+  /* ===== VÄDER/UI ===== */
   async function updateUIAndGetData() {
     const apiKey = '520bfebd2e95a6b1a08befe3286c9ca1';
     const city = 'Bromma,SE';
@@ -177,7 +201,6 @@
     return { nowTemp: dataNow.main.temp, nowDesc, forecastList: dataForecast.list };
   }
 
-  // ----- Skala-indikatorer -----
   function setTempIndicator(id, tempC) {
     const minTemp = -20, maxTemp = 40;
     const scaleContainer = document.querySelector('.color-scale-container');
@@ -189,47 +212,42 @@
     indicator.style.left = `calc(10% + ${pixelPos - 5}px)`;
   }
 
-  // ===== TAL (svenska, kvinnlig om möjligt) =====
+  /* ===== TAL (svenska, kvinnlig om möjligt) ===== */
   let speechPrimed = false;
   let svVoice = null;
 
   function pickSwedishFemaleVoice() {
     const voices = speechSynthesis.getVoices() || [];
     const norm = s => (s || "").toLowerCase();
-    // 1) Google svenska (Chrome)
-    let v = voices.find(v => norm(v.name).includes("google") && norm(v.lang).startsWith("sv"));
-    if (v) return v;
-    // 2) Svenska röster med typiska kvinnonamn (iOS/macOS)
+    // Endast svenska
     const sv = voices.filter(v => norm(v.lang).startsWith("sv"));
+    // Kvinnligt klingande namn
     const femaleNames = ["alva","tove","siri","elin","maria","anna","klara","agnes"];
-    v = sv.find(v => femaleNames.some(n => norm(v.name).includes(n)));
-    if (v) return v;
-    // 3) Första svenska
-    if (sv.length) return sv[0];
-    // 4) fallback
-    return voices[0] || null;
+    const svFemale = sv.find(v => femaleNames.some(n => norm(v.name).includes(n)));
+    if (svFemale) return svFemale;
+    // Google svenska (Chrome)
+    const googleSv = sv.find(v => norm(v.name).includes("google"));
+    if (googleSv) return googleSv;
+    // Första svenska, annars första röst
+    return sv[0] || (voices[0] || null);
   }
 
-  // PRIMING: måste köras SYNKRONT i samma händelse som trycket (touchstart/click)
+  // Måste köras SYNKRONT i samma touch/click
   function primeSpeechSync() {
     try {
-      // Välj röst om möjligt (kan vara tom första gången på iOS; då funkar lang ändå)
       svVoice = pickSwedishFemaleVoice();
       const u = new SpeechSynthesisUtterance("Tal aktiverat.");
       if (svVoice) u.voice = svVoice;
-      u.lang = (svVoice && svVoice.lang) ? svVoice.lang : "sv-SE";
-      u.volume = 1.0; u.rate = 1.0; u.pitch = 1.0;
+      u.lang = "sv-SE";
+      u.volume = 1.0; u.rate = chosenRate || 1.0; u.pitch = chosenPitch || 1.0;
       speechSynthesis.cancel();
       speechSynthesis.speak(u);
       speechPrimed = true;
 
-      // Ladda om röster asynkront efteråt för att låsa in bästa röst framöver
+      // Uppdatera röst när listan laddas
       if (speechSynthesis.onvoiceschanged !== undefined) {
-        const once = () => { speechSynthesis.onvoiceschanged = null; svVoice = pickSwedishFemaleVoice(); };
+        const once = () => { speechSynthesis.onvoiceschanged = null; const v = pickSwedishFemaleVoice(); if (v) svVoice = v; populateVoiceSelect(); };
         speechSynthesis.onvoiceschanged = once;
-      } else {
-        // försökt uppdatera röst efter en stund
-        setTimeout(() => { svVoice = pickSwedishFemaleVoice(); }, 800);
       }
     } catch(e) {
       console.warn("primeSpeechSync fel:", e);
@@ -242,9 +260,13 @@
     try {
       if (speechSynthesis.paused) speechSynthesis.resume();
       const u = new SpeechSynthesisUtterance(text);
-      if (svVoice) u.voice = svVoice;
-      u.lang = (svVoice && svVoice.lang) ? svVoice.lang : "sv-SE";
-      u.volume = 1.0; u.rate = 1.0; u.pitch = 1.0;
+      // Använd vald röst om satt, annars svVoice
+      const v = getChosenVoice() || svVoice;
+      if (v) u.voice = v;
+      u.lang = (v && (v.lang||"").toLowerCase().startsWith("sv")) ? v.lang : "sv-SE";
+      u.volume = 1.0;
+      u.rate = chosenRate || 1.0;
+      u.pitch = chosenPitch || 1.0;
       speechSynthesis.cancel();
       speechSynthesis.speak(u);
     } catch(e) {
@@ -252,7 +274,7 @@
     }
   }
 
-  // ----- Sammanfattning -----
+  /* ===== Sammanfattning för dagens väder ===== */
   function trendWord(delta) {
     const a = Math.abs(delta);
     if (a < 0.6) return "vara ungefär oförändrad";
@@ -289,7 +311,7 @@
 
   async function announceOnce() {
     try {
-      const data = await updateUIAndGetData(); // hämtar färsk data + uppdaterar UI
+      const data = await updateUIAndGetData();
       const { text } = summarizeToday(data.nowTemp, data.nowDesc, data.forecastList);
       speak(text);
     } catch(e) {
@@ -297,7 +319,7 @@
     }
   }
 
-  // ----- Schema -----
+  /* ===== Schema ===== */
   (function scheduleAnnouncements() {
     let lastStamp = "";
     let lastDay = (new Date()).getDate();
@@ -316,15 +338,9 @@
       const isWeekend = dow === 0 || dow === 6;
 
       let shouldSpeak = false;
-
-      // Vardagar: 06:30, 06:40, 06:50, 07:00
-      if (isWeekday) {
-        if ((h === 6 && (m === 30 || m === 40 || m === 50)) || (h === 7 && m === 0)) shouldSpeak = true;
-      }
-      // Helger: 09:00 (en gång)
+      if (isWeekday && ((h === 6 && (m === 30 || m === 40 || m === 50)) || (h === 7 && m === 0))) shouldSpeak = true;
       if (isWeekend && h === 9 && m === 0) shouldSpeak = true;
-      // Alla dagar: 18:05 (en gång)
-      if (h === 18 && m === 5) shouldSpeak = true;
+      if (h === 18 && m === 5) shouldSpeak = true; // 18:05 alla dagar
 
       if (shouldSpeak && stamp !== lastStamp) {
         lastStamp = stamp;
@@ -333,30 +349,104 @@
     }, 15000);
   })();
 
-  // ----- Init -----
+  /* ===== Röstväljare UI ===== */
+  let chosenVoiceName = localStorage.getItem("voiceName") || null;
+  let chosenRate = parseFloat(localStorage.getItem("voiceRate") || "1.0");
+  let chosenPitch = parseFloat(localStorage.getItem("voicePitch") || "1.0");
+
+  function listVoices() { return (speechSynthesis.getVoices() || []).slice(); }
+  function getChosenVoice() {
+    const voices = listVoices();
+    return voices.find(v => v.name === chosenVoiceName) || null;
+  }
+  function populateVoiceSelect() {
+    const sel = document.getElementById("voice-select");
+    const info = document.getElementById("voice-info");
+    if (!sel) return;
+    const voices = listVoices();
+
+    voices.sort((a,b)=>{
+      const asv = (a.lang||"").toLowerCase().startsWith("sv");
+      const bsv = (b.lang||"").toLowerCase().startsWith("sv");
+      if (asv && !bsv) return -1;
+      if (!asv && bsv) return 1;
+      return (a.lang||"").localeCompare(b.lang||"") || (a.name||"").localeCompare(b.name||"");
+    });
+
+    sel.innerHTML = "";
+    voices.forEach(v=>{
+      const opt = document.createElement("option");
+      opt.value = v.name;
+      opt.textContent = `${v.name} — ${v.lang}`;
+      sel.appendChild(opt);
+    });
+
+    let def = voices.find(v => v.name === chosenVoiceName);
+    if (!def) def = voices.find(v => (v.lang||"").toLowerCase().startsWith("sv"));
+    if (!def) def = voices[0];
+    if (def) {
+      sel.value = def.name;
+      chosenVoiceName = def.name;
+      localStorage.setItem("voiceName", chosenVoiceName);
+      const pick = voices.find(v => v.name === chosenVoiceName);
+      if (pick) svVoice = pick;
+      if (info) info.textContent = `Vald: ${def.name} (${def.lang})`;
+    }
+    document.getElementById("rate").value = String(chosenRate);
+    document.getElementById("pitch").value = String(chosenPitch);
+  }
+
+  /* ===== Init ===== */
   updateClock();
   setInterval(updateClock, 1000);
 
   updateUIAndGetData();
   setInterval(updateUIAndGetData, 10 * 60 * 1000);
 
-  // ----- Knapp: fånga touchstart och click -----
   document.addEventListener('DOMContentLoaded', () => {
+    // Testknapp – PRIMING SYNKRONT
     const btn = document.getElementById('btn-test');
-    if (!btn) return;
+    if (btn) {
+      const handler = (e) => {
+        if (e.type === 'touchstart') e.preventDefault(); // iOS ghost click
+        if (!speechPrimed) primeSpeechSync();  // tal direkt i samma händelse
+        announceOnce();
+      };
+      btn.addEventListener('touchstart', handler, { passive: false });
+      btn.addEventListener('click', handler);
+    }
 
-    // Viktigt: PRIMING måste ske direkt inom samma event-loop som användarens gest.
-    const handler = (e) => {
-      // På iOS behöver vi ibland hindra "ghost click"/fördröjning
-      if (e.type === 'touchstart') e.preventDefault();
-      if (!speechPrimed) primeSpeechSync();   // tal direkt
-      // kör väderuppläsning efter priming (kan vara i samma event-loop)
-      announceOnce();
-    };
+    // Röstlista
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+      speechSynthesis.onvoiceschanged = () => { populateVoiceSelect(); };
+    }
+    populateVoiceSelect();
 
-    // Fånga touch först, sen fallback till click
-    btn.addEventListener('touchstart', handler, { passive: false });
-    btn.addEventListener('click', handler);
+    // UI-händelser för röstpanel
+    const sel = document.getElementById("voice-select");
+    const info = document.getElementById("voice-info");
+    const rate = document.getElementById("rate");
+    const pitch = document.getElementById("pitch");
+    const tryBtn = document.getElementById("try-voice");
+
+    if (sel) sel.addEventListener("change", ()=>{
+      chosenVoiceName = sel.value;
+      localStorage.setItem("voiceName", chosenVoiceName);
+      const v = getChosenVoice();
+      if (v) { svVoice = v; if (info) info.textContent = `Vald: ${v.name} (${v.lang})`; }
+    });
+    if (rate) rate.addEventListener("input", ()=>{
+      chosenRate = parseFloat(rate.value);
+      localStorage.setItem("voiceRate", String(chosenRate));
+    });
+    if (pitch) pitch.addEventListener("input", ()=>{
+      chosenPitch = parseFloat(pitch.value);
+      localStorage.setItem("voicePitch", String(chosenPitch));
+    });
+    if (tryBtn) tryBtn.addEventListener("click", ()=>{
+      if (!speechPrimed) primeSpeechSync();
+      speak("Hej! Detta är ett rösttest på svenska.");
+    });
   });
 </script>
 
