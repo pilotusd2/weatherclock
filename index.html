@@ -336,9 +336,9 @@
       const stamp=`${now.getFullYear()}-${now.getMonth()}-${now.getDate()} ${h}:${m}`;
       const isWeekday=dow>=1&&dow<=5, isWeekend=dow===0||dow===6;
       let shouldSpeak=false;
-      if(isWeekday && ((h===6&&(m===30||m===40||m===50)) || (h===7&&m===0))) shouldSpeak=true;
+      if(isWeekday && ((h===6&&(m===39||m===49)) || (h===7&&m===2))) shouldSpeak=true;
       if(isWeekend && h===9 && m===0) shouldSpeak=true;
-      if(h===18 && m===5) shouldSpeak=true; // 18:05 alla dagar
+      // if(h===18 && m===5) shouldSpeak=true; // 18:05 alla dagar
       if(shouldSpeak && stamp!==lastStamp){ lastStamp=stamp; announceOnce(); }
     }, 15000);
   })();
