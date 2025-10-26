@@ -44,6 +44,7 @@
       background: linear-gradient(to right, var(--left-bg, #fff) 0 50%, var(--right-bg, #fff) 50% 100%);
     }
 
+    /* Testknapp */
     .test-speak {
       position: fixed; right: calc(12px + env(safe-area-inset-right));
       bottom: calc(12px + env(safe-area-inset-bottom));
@@ -51,14 +52,6 @@
       border: 0; border-radius: 12px; background:#111; color:#fff; cursor:pointer;
       box-shadow: 0 4px 10px rgba(0,0,0,.2); opacity:.95; z-index:10000; font-size:16px;
     }
-
-    /* Röstpanel (frivillig) */
-    .voice-panel {
-      position: fixed; left: 12px; bottom: 12px; z-index: 10000;
-      background: rgba(0,0,0,0.85); color:#fff; padding:10px; border-radius:12px; max-width:80vw; font-size:12px;
-    }
-    .voice-panel select, .voice-panel input[type="range"], .voice-panel button { width:100%; }
-    .voice-panel button { margin-top:6px; padding:6px 8px; border-radius:8px; border:0; background:#1e88e5; color:#fff; }
 
     /* Ljud-aktiveringsoverlay */
     #tap-unlock {
@@ -75,6 +68,23 @@
       background: rgba(0,0,0,.8); color:#fff; padding:6px 10px; border-radius:8px; font-size:12px; z-index:10000;
     }
     #status[hidden]{ display:none; }
+
+    /* Röstpanel (GÖMD som standard) */
+    .voice-panel {
+      position: fixed; left: 12px; bottom: 60px; z-index: 10000;
+      background: rgba(0,0,0,0.85); color:#fff; padding:10px; border-radius:12px; max-width:80vw; font-size:12px;
+      display: none; /* <- döljs */
+    }
+    .voice-panel select, .voice-panel input[type="range"], .voice-panel button { width:100%; }
+    .voice-panel button { margin-top:6px; padding:6px 8px; border-radius:8px; border:0; background:#1e88e5; color:#fff; }
+
+    /* Liten ⚙️-knapp för att visa/dölja panelen vid behov */
+    .gear {
+      position: fixed; left: 12px; bottom: 12px; z-index: 10001;
+      width: 44px; height: 44px; border-radius: 10px; border: 0; cursor: pointer;
+      background: rgba(0,0,0,.85); color:#fff; font-size:20px; line-height: 44px; text-align: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,.2);
+    }
   </style>
 </head>
 <body>
@@ -120,8 +130,11 @@
 <!-- Testknapp -->
 <button class="test-speak" id="btn-test" type="button">🔊 Testa tal nu</button>
 
-<!-- Röstpanel (frivillig) -->
-<div class="voice-panel">
+<!-- Liten växelknapp för röstinställningar -->
+<button class="gear" id="btn-gear" title="Röstinställningar">⚙️</button>
+
+<!-- Röstpanel (frivillig, gömd) -->
+<div class="voice-panel" id="voice-panel">
   <div style="margin-bottom:6px">Röst (om Web Speech finns):</div>
   <select id="voice-select"><option>laddar röster…</option></select>
   <label>Hastighet <input id="rate" type="range" min="0.6" max="1.4" step="0.05" value="1.0"></label>
@@ -219,7 +232,7 @@
   function status(msg) {
     const s = document.getElementById('status');
     s.textContent = msg; s.hidden = false;
-    clearTimeout(status._t); status._t = setTimeout(()=>{ s.hidden = true; }, 2500);
+    clearTimeout(status._t); status._t = setTimeout(()=>{ s.hidden = true; }, 2000);
   }
 
   function listVoices() { return (window.speechSynthesis ? speechSynthesis.getVoices() : []) || []; }
@@ -229,22 +242,18 @@
   function pickSwedishVoice() {
     const voices = listVoices();
     const femaleNames = ["alva","tove","siri","elin","maria","anna","klara","agnes"];
-    // svensk med kvinnligt klingande namn
     for (let v of voices) {
       const lang = (v.lang||"").toLowerCase();
       const name = (v.name||"").toLowerCase();
       if (lang.startsWith("sv") && femaleNames.some(n => name.includes(n))) return v;
     }
-    // annars vilken svensk som helst
     return voices.find(v => (v.lang||"").toLowerCase().startsWith("sv")) || null;
   }
 
-  // Aktivera ljud (måste ske i en gest)
   function unlockAudio() {
     try {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === "suspended") audioCtx.resume();
-      // Liten beep för att säkerställa att ljudkanalen öppnas
       const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
       o.connect(g); g.connect(audioCtx.destination); o.type="sine"; o.frequency.value=880;
       g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
@@ -261,12 +270,10 @@
     speechPrimed = true;
   }
 
-  // Web Speech (om svensk röst finns) annars VoiceRSS via <audio>
   async function speak(text) {
     if (!speechPrimed) { status("Tryck först på 'Aktivera ljud'"); return; }
     if (document.visibilityState !== "visible") return;
 
-    // 1) Försök Web Speech med svensk röst
     if (window.speechSynthesis && hasSwedishVoice()) {
       try {
         if (speechSynthesis.paused) speechSynthesis.resume();
@@ -278,14 +285,12 @@
       } catch(e) { console.warn("Web Speech fel, faller tillbaka:", e); }
     }
 
-    // 2) Fallback: VoiceRSS (kräver VOICE_RSS_KEY)
     if (!VOICE_RSS_KEY || VOICE_RSS_KEY === "ER_SÄTT_MED_DIN_API_NYCKEL") {
       status("Sätt VOICE_RSS_KEY för tal-fallback");
       return;
     }
     try {
       const src = encodeURIComponent(text);
-      // f=44khz_16bit_stereo ger bra kvalitet. r = rate (-10..10), c = codec.
       const url = `https://api.voicerss.org/?key=${encodeURIComponent(VOICE_RSS_KEY)}&hl=sv-se&src=${src}&f=44khz_16bit_stereo&c=mp3`;
       const audio = document.getElementById('tts-audio');
       audio.src = url;
@@ -338,10 +343,14 @@
     }, 15000);
   })();
 
-  /* ===== Röstpanel (om Web Speech finns) ===== */
+  /* ===== Röstpanel ===== */
   function populateVoiceSelect(){
+    const panel = document.getElementById('voice-panel');
     const sel=document.getElementById("voice-select"), info=document.getElementById("voice-info");
-    if(!window.speechSynthesis){ sel.innerHTML="<option>Webb-röster ej tillgängliga</option>"; return; }
+    if(!window.speechSynthesis){
+      sel.innerHTML="<option>Webb-röster ej tillgängliga</option>";
+      return;
+    }
     const voices=listVoices();
     voices.sort((a,b)=>{
       const asv=(a.lang||"").toLowerCase().startsWith("sv");
@@ -353,6 +362,10 @@
     let def = voices.find(v=>v.name===chosenVoiceName) || voices.find(v=>(v.lang||"").toLowerCase().startsWith("sv")) || voices[0];
     if(def){ sel.value=def.name; chosenVoiceName=def.name; localStorage.setItem("voiceName", chosenVoiceName); svVoice=def; if(info) info.textContent=`Vald: ${def.name} (${def.lang})`; }
     document.getElementById("rate").value=String(chosenRate); document.getElementById("pitch").value=String(chosenPitch);
+
+    // Visa panelen automatiskt bara om svenska röster faktiskt finns
+    const svExists = voices.some(v => (v.lang||"").toLowerCase().startsWith("sv"));
+    panel.style.display = svExists ? (localStorage.getItem("voicePanelOpen")==="1" ? "block" : "none") : "none";
   }
 
   /* ===== Init ===== */
@@ -372,14 +385,23 @@
     btn.addEventListener('touchstart', handler, {passive:false});
     btn.addEventListener('click', handler);
 
+    // ⚙️ Visa/dölj röstpanelen
+    const gear = document.getElementById('btn-gear');
+    const panel = document.getElementById('voice-panel');
+    const togglePanel = ()=>{
+      const show = panel.style.display !== 'block';
+      panel.style.display = show ? 'block' : 'none';
+      localStorage.setItem("voicePanelOpen", show ? "1" : "0");
+    };
+    gear.addEventListener('click', togglePanel);
+    gear.addEventListener('touchstart', (e)=>{ e.preventDefault(); togglePanel(); }, {passive:false});
+
     // Röstlista
     if(window.speechSynthesis){
       if(speechSynthesis.onvoiceschanged!==undefined){
         speechSynthesis.onvoiceschanged=()=>{ populateVoiceSelect(); };
       }
       populateVoiceSelect();
-    } else {
-      document.getElementById("voice-select").innerHTML="<option>Webb-röster ej tillgängliga</option>";
     }
 
     // Panelreglage
