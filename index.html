@@ -21,13 +21,18 @@
       transition: background-color .6s ease, color .6s ease;
     }
 
-    .weather-icon {
-    filter: 
-      blur(4px)
-      brightness(0.9)
-      saturate(0.9);
-    opacity: 0.55;
+  .weather-icon {
+    position: absolute;
+    top: 4vh;              /* flytta ner lite från toppen */
+    width: 100%;
+    max-height: 35vh;      /* 🔴 detta är nyckeln */
+    object-fit: contain;   /* behåll proportioner */
+    filter: blur(4px) brightness(0.9) saturate(0.9);
+    opacity: 0.45;
+    z-index: 1;
+    pointer-events: none;
   }
+
   
     .temp-now, .temp-forecast {
     position: absolute;
