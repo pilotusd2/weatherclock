@@ -20,8 +20,19 @@
       align-items: center; justify-content: flex-start; padding-top: 30px;
       transition: background-color .6s ease, color .6s ease;
     }
-    .weather-icon { width: 100%; height: auto; filter: drop-shadow(0 0 4px black);
-      position: absolute; top: 0; left: 0; z-index: 0; pointer-events: none; }
+
+    
+    .weather-icon {
+  filter: 
+    blur(4px)
+    brightness(0.9)
+    saturate(0.9);
+  opacity: 0.55;
+}
+
+    
+    
+    
     .temp-now, .temp-forecast {
       font-size: 11vw; position: absolute; top: 50%; width: 100%;
       text-align: center; z-index: 1; margin-top: 20px; text-shadow: 0 0 6px rgba(0,0,0,.35);
